@@ -78,8 +78,18 @@
     }
     .toggle-wrap {
       position: fixed; bottom: 3rem; left: 50%; transform: translateX(-50%);
-      display: flex; flex-direction: column; align-items: center; gap: 0.65rem; z-index: 10;
+      display: flex; align-items: center; gap: 1.1rem; z-index: 10;
     }
+    .back-btn {
+      background: none; border: none; cursor: pointer; padding: 0.4rem;
+      color: rgba(255,255,255,0.45); font-size: 1.4rem; line-height: 1;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.2s ease;
+      text-shadow: 0 1px 6px rgba(0,0,0,0.7);
+      user-select: none;
+    }
+    .toggle-wrap:hover .back-btn { opacity: 1; pointer-events: auto; }
+    .back-btn:hover { color: rgba(255,255,255,0.8); }
     .toggle {
       width: 72px; height: 38px; border-radius: 999px; border: none; cursor: pointer;
       position: relative; padding: 0; outline: none; background: var(--accent);
@@ -103,6 +113,38 @@
       color: rgba(255,255,255,0.25); letter-spacing: 0.06em;
       z-index: 10; pointer-events: none;
     }
+    /* Save icon */
+    /* Save icon (hidden, kept for saved-mode state on dot) */
+    #saveIcon {
+      position: fixed; bottom: 3.2rem; right: 1.7rem;
+      font-size: 1.05rem; line-height: 1;
+      color: rgba(255,255,255,0.22);
+      z-index: 10; opacity: 0; cursor: default;
+      transition: color 0.4s ease, opacity 0.4s ease;
+      user-select: none; pointer-events: none;
+    }
+    #saveIcon.has-saves { opacity: 1; color: rgba(255,255,255,0.45); cursor: pointer; pointer-events: auto; }
+    #saveIcon.saved-mode { opacity: 1; color: rgba(255,255,255,0.9); cursor: pointer; pointer-events: auto; }
+    /* "tap to save" hint */
+    #saveHint {
+      position: fixed; bottom: 42%; left: 50%; transform: translateX(-50%);
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase;
+      color: rgba(255,255,255,0.45);
+      text-shadow: 0 1px 6px rgba(0,0,0,0.7);
+      z-index: 20; pointer-events: none;
+      opacity: 0; transition: opacity 0.6s ease;
+    }
+    #saveHint.show { opacity: 1; }
+    /* save confirmation flash */
+    #saveFlash {
+      position: fixed; bottom: 3.65rem; right: 1.65rem;
+      font-size: 0.7rem; color: rgba(255,255,255,0.8);
+      z-index: 20; pointer-events: none;
+      opacity: 0; transition: opacity 0.2s ease;
+    }
+    #saveFlash.show { opacity: 1; }
+    .quote-wrap { cursor: pointer; }
     @media (max-width: 480px) { .quote-wrap::before { font-size: 4rem; } }
   </style>
 </head>
@@ -119,8 +161,12 @@
     </div>
   </div>
   <div class="toggle-wrap">
+    <button class="back-btn" id="backBtn" aria-label="Previous quote" title="Previous quote">&#8249;</button>
     <button class="toggle" id="nextBtn" aria-label="Next quote" title="Next quote"></button>
   </div>
+  <div id="saveIcon"></div>
+  <span id="saveHint">tap quote to save</span>
+  <span id="saveFlash">✦</span>
   <span id="paintingCredit"></span>
 
   <script>
@@ -1211,6 +1257,7 @@
     if (!animate) {
       themeBg.style.backgroundImage = `url('${p.url}')`;
       paintingCredit.textContent = p.credit;
+
       return;
     }
     themeBg.classList.add('fading');
@@ -1218,6 +1265,7 @@
       themeBg.style.backgroundImage = `url('${p.url}')`;
       paintingCredit.textContent = p.credit;
       themeBg.classList.remove('fading');
+
     }, 300);
   }
 
@@ -1243,18 +1291,157 @@
     for (let i = 1; i <= 3; i++) fetchPainting((current + i) % Q.length);
   }
 
-  nextBtn.addEventListener('click', () => {
+  const backBtn = document.getElementById('backBtn');
+  const saveIcon = document.getElementById('saveIcon');
+  const saveHint = document.getElementById('saveHint');
+  const saveFlash = document.getElementById('saveFlash');
+
+  // ── Saves ────────────────────────────────────────────────────────────────
+  const SAVE_KEY = 'quote_saves_v1';
+  const HINT_KEY = 'quote_hint_shown_v1';
+  function getSaves() { try { return JSON.parse(localStorage.getItem(SAVE_KEY) || '[]'); } catch { return []; } }
+  function setSaves(a) { try { localStorage.setItem(SAVE_KEY, JSON.stringify(a)); } catch {} }
+  function hintShown() { return !!localStorage.getItem(HINT_KEY); }
+  function markHintShown() { try { localStorage.setItem(HINT_KEY, '1'); } catch {} }
+
+  let savedMode = false;
+
+  function updateDot() {
+    const saves = getSaves();
+    saveIcon.classList.toggle('has-saves', saves.length > 0);
+    saveIcon.classList.toggle('saved-mode', savedMode);
+  }
+
+  function flashSave(saved) {
+    saveFlash.textContent = saved ? '✦' : '✧';
+    saveFlash.classList.add('show');
+    setTimeout(() => saveFlash.classList.remove('show'), 900);
+  }
+
+  function toggleSave() {
+    const saves = getSaves();
+    const idx = saves.indexOf(current);
+    if (idx === -1) {
+      saves.push(current);
+      setSaves(saves);
+      flashSave(true);
+    } else {
+      saves.splice(idx, 1);
+      setSaves(saves);
+      flashSave(false);
+      if (savedMode && saves.length === 0) exitSavedMode();
+    }
+    updateDot();
+  }
+
+  function enterSavedMode() {
+    savedMode = true;
+    const saves = getSaves();
+    if (saves.length) { current = saves[0]; showQuote(true); }
+    updateDot();
+  }
+
+  function exitSavedMode() {
+    savedMode = false;
+    updateDot();
+  }
+
+  saveIcon.addEventListener('click', () => {
+    const saves = getSaves();
+    if (!saves.length) return;
+    if (savedMode) exitSavedMode();
+    else enterSavedMode();
+  });
+
+  // Quote tap to save
+  document.querySelector('.quote-wrap').addEventListener('click', toggleSave);
+
+  // ── Linger hint ──────────────────────────────────────────────────────────
+  const LINGER_MS = 9000;
+  let lingerTimer = null;
+
+  function stopLinger() { clearTimeout(lingerTimer); }
+
+  function resetLinger() {
+    stopLinger();
+    lingerTimer = setTimeout(() => {
+      if (getSaves().includes(current)) return;
+      if (!hintShown()) {
+        saveHint.classList.add('show');
+        setTimeout(() => { saveHint.classList.remove('show'); markHintShown(); }, 2800);
+      }
+    }, LINGER_MS);
+  }
+
+  function goForward() {
+    if (nextBtn.disabled) return;
+    stopLinger();
     nextBtn.disabled = true;
     nextBtn.classList.add('switching');
-    current = (current + 1) % Q.length;
+    if (savedMode) {
+      const saves = getSaves();
+      const pos = saves.indexOf(current);
+      current = saves[(pos + 1) % saves.length];
+    } else {
+      current = (current + 1) % Q.length;
+    }
     showQuote(true);
     setTimeout(() => { nextBtn.classList.remove('switching'); nextBtn.disabled = false; }, 350);
-  });
+  }
+
+  function goBack() {
+    if (nextBtn.disabled) return;
+    stopLinger();
+    nextBtn.disabled = true;
+    nextBtn.classList.add('switching');
+    if (savedMode) {
+      const saves = getSaves();
+      const pos = saves.indexOf(current);
+      current = saves[(pos - 1 + saves.length) % saves.length];
+    } else {
+      current = (current - 1 + Q.length) % Q.length;
+    }
+    showQuote(true);
+    setTimeout(() => { nextBtn.classList.remove('switching'); nextBtn.disabled = false; }, 350);
+  }
+
+  // Long-press on toggle to go back (~400ms)
+  let longPressTimer = null;
+  let didLongPress = false;
+
+  function startLongPress() {
+    didLongPress = false;
+    longPressTimer = setTimeout(() => {
+      didLongPress = true;
+      goBack();
+    }, 400);
+  }
+  function cancelLongPress() { clearTimeout(longPressTimer); }
+
+  nextBtn.addEventListener('mousedown', startLongPress);
+  nextBtn.addEventListener('mouseup', cancelLongPress);
+  nextBtn.addEventListener('mouseleave', cancelLongPress);
+  nextBtn.addEventListener('touchstart', e => { e.preventDefault(); startLongPress(); }, { passive: false });
+  nextBtn.addEventListener('touchend', cancelLongPress);
+  nextBtn.addEventListener('touchcancel', cancelLongPress);
+
+  nextBtn.addEventListener('click', () => { if (!didLongPress) goForward(); });
+  backBtn.addEventListener('click', goBack);
 
   document.addEventListener('keydown', e => {
-    if (e.code === 'Space' || e.code === 'ArrowRight') { e.preventDefault(); nextBtn.click(); }
+    if (e.code === 'Space' || e.code === 'ArrowRight') { e.preventDefault(); goForward(); }
+    if (e.code === 'ArrowLeft') { e.preventDefault(); goBack(); }
   });
 
+  // Call resetLinger and updateDot after each quote change
+  const _origShowQuote = showQuote;
+  showQuote = async function(animate) {
+    resetLinger();
+    await _origShowQuote(animate);
+  };
+
+  updateDot();
+  resetLinger();
   showQuote(false);
   </script>
 </body>
