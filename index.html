@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>A Light in the Dark</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,300;1,400&family=Playfair+Display:ital@1&family=EB+Garamond:ital@1&family=Bodoni+Moda:ital,opsz@1,6..96&family=Spectral:ital@1&family=Fraunces:ital,wght@1,300;1,400&family=Philosopher:ital@1&family=Cardo:ital@1&family=Libre+Baskerville:ital@1&family=Lora:ital@1&display=swap">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root { --accent: #7c6af0; --accent-glow: rgba(124,106,240,0.3); }
@@ -38,7 +40,7 @@
       display: flex; flex-direction: column; align-items: center; gap: 2rem;
       text-align: center;
     }
-    .quote-wrap { cursor: grab; }
+    .quote-wrap { cursor: grab; user-select: none; -webkit-user-select: none; }
     .quote-wrap.dragging { cursor: grabbing; }
     .header h1 {
       font-size: clamp(0.7rem,1.8vw,0.85rem);
@@ -116,6 +118,14 @@
       color: rgba(255,255,255,0.25); letter-spacing: 0.06em;
       z-index: 10; pointer-events: none;
     }
+    #fontLabel {
+      position: fixed; bottom: 0.6rem; left: 1rem;
+      font-family: 'Helvetica Neue',Arial,sans-serif; font-size: 0.6rem;
+      color: rgba(255,255,255,0.28); letter-spacing: 0.06em;
+      z-index: 10; cursor: pointer; user-select: none;
+      transition: color 0.2s ease, opacity 0.3s ease;
+    }
+    #fontLabel:hover { color: rgba(255,255,255,0.6); }
     /* First-visit nav hint */
     #navHint {
       position: fixed; bottom: 5.5rem; left: 50%; transform: translateX(-50%);
@@ -139,17 +149,19 @@
       opacity: 0; transition: opacity 0.25s ease;
     }
     #saveLabel.show { opacity: 1; }
-    /* Save icon (hidden, kept for saved-mode state on dot) */
+    /* Save icon */
     #saveIcon {
-      position: fixed; bottom: 3.2rem; right: 1.7rem;
-      font-size: 1.05rem; line-height: 1;
+      position: fixed; bottom: 18.75vh; right: 12.5vw;
+      width: 56px; height: 92px;
       color: rgba(255,255,255,0.22);
-      z-index: 10; opacity: 0; cursor: default;
+      z-index: 10; opacity: 0.18; cursor: default;
       transition: color 0.4s ease, opacity 0.4s ease;
-      user-select: none; pointer-events: none;
+      transform-origin: bottom right;
+      user-select: none; pointer-events: auto;
+      filter: drop-shadow(0 1px 4px rgba(0,0,0,0.6));
     }
-    #saveIcon.has-saves { opacity: 1; color: rgba(255,255,255,0.45); cursor: pointer; pointer-events: auto; }
-    #saveIcon.saved-mode { opacity: 1; color: rgba(255,255,255,0.9); cursor: pointer; pointer-events: auto; }
+    #saveIcon.has-saves { opacity: 0.5; color: rgba(255,255,255,0.5); cursor: pointer; }
+    #saveIcon.saved-mode { opacity: 0.95; color: rgba(255,255,255,0.95); cursor: pointer; }
     /* "tap to save" hint */
     #saveHint {
       position: fixed; bottom: 42%; left: 50%; transform: translateX(-50%);
@@ -190,11 +202,14 @@
     <button class="toggle" id="nextBtn" aria-label="Next quote" title="Next quote"></button>
   </div>
   <div id="navHint"><span>‹ back</span><span>next ›</span></div>
-  <div id="saveIcon"></div>
+  <svg id="saveIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 52" fill="currentColor">
+    <path d="M5 48 C2 36 10 22 18 10 C23 4 28 1 30 4 C25 7 20 13 15 24 C20 18 25 15 27 18 C22 26 14 36 9 50 Z"/>
+  </svg>
   <span id="saveLabel">saved</span>
   <span id="saveHint">tap quote to save</span>
   <span id="saveFlash">✦</span>
   <span id="paintingCredit"></span>
+  <div id="fontLabel"></div>
 
   <script>
   // Art Institute of Chicago — free public API, public domain artworks
@@ -1400,26 +1415,93 @@
     else enterSavedMode();
   });
 
-  // ── Draggable quote ──────────────────────────────────────────────────────
+  // ── Draggable quote → quill drop-to-save ─────────────────────────────────
   const wrapper = document.querySelector('.wrapper');
   const quoteWrap = document.querySelector('.quote-wrap');
   let dragState = null;
+  let dragMoved = false; // persists after endDrag to suppress swipe
+
+  const QUILL_INFLUENCE = 230;
+  const QUILL_SNAP      = 90;
 
   function resetWrapperPosition() {
     wrapper.style.left = '';
     wrapper.style.top = '';
     wrapper.style.transform = '';
+    wrapper.style.transition = '';
+    wrapper.style.opacity = '';
+  }
+
+  function quillCenter() {
+    const r = saveIcon.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }
+  function wrapperCenter() {
+    const r = wrapper.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }
+
+  function applyProximity(progress) {
+    saveIcon.style.transition = 'none';
+    saveIcon.style.transform = `scale(${1 + progress * 2.2})`;
+    quoteWrap.style.transition = 'none';
+    quoteWrap.style.transform = `scale(${Math.max(0.25, 1 - progress * 0.75)})`;
+  }
+
+  function resetProximity() {
+    saveIcon.style.transition = 'transform 0.45s cubic-bezier(0.34,1.4,0.64,1), opacity 0.4s ease';
+    saveIcon.style.transform = '';
+    saveIcon.style.opacity = '';
+    quoteWrap.style.transition = 'transform 0.45s cubic-bezier(0.34,1.4,0.64,1)';
+    quoteWrap.style.transform = '';
+    setTimeout(() => { saveIcon.style.transition = ''; quoteWrap.style.transition = ''; }, 500);
+  }
+
+  function snapBackWrapper() {
+    wrapper.style.transition = 'left 0.45s cubic-bezier(0.34,1.3,0.64,1), top 0.45s cubic-bezier(0.34,1.3,0.64,1)';
+    wrapper.style.left = '50%';
+    wrapper.style.top = '50%';
+    wrapper.style.transform = 'translate(-50%,-50%)';
+    setTimeout(resetWrapperPosition, 500);
+  }
+
+  function saveAndAdvance() {
+    const qc = quillCenter();
+    wrapper.style.transition = 'left 0.28s ease, top 0.28s ease, opacity 0.28s ease, transform 0.28s ease';
+    wrapper.style.left = qc.x + 'px';
+    wrapper.style.top  = qc.y + 'px';
+    wrapper.style.opacity = '0';
+    wrapper.style.transform = 'translate(-50%,-50%) scale(0.05)';
+    // Quill absorbs: spike up then spring back
+    saveIcon.style.transition = 'transform 0.15s ease';
+    saveIcon.style.transform = 'scale(3.5)';
+    setTimeout(() => {
+      saveIcon.style.transition = 'transform 0.35s cubic-bezier(0.34,1.6,0.64,1)';
+      saveIcon.style.transform = '';
+    }, 150);
+    setTimeout(() => {
+      toggleSave();
+      resetWrapperPosition();
+      quoteWrap.style.transition = '';
+      quoteWrap.style.transform = '';
+      saveIcon.style.transition = '';
+      saveIcon.style.transform = '';
+      goForward();
+    }, 310);
   }
 
   function startDrag(e) {
     if (e.button !== undefined && e.button !== 0) return;
     const pt = e.touches ? e.touches[0] : e;
     const rect = wrapper.getBoundingClientRect();
+    wrapper.style.transition = 'none';
     wrapper.style.transform = 'none';
     wrapper.style.left = rect.left + 'px';
-    wrapper.style.top = rect.top + 'px';
-    dragState = { x0: pt.clientX, y0: pt.clientY, left0: rect.left, top0: rect.top, moved: false };
+    wrapper.style.top  = rect.top  + 'px';
+    dragState = { x0: pt.clientX, y0: pt.clientY, left0: rect.left, top0: rect.top, moved: false, dist: Infinity };
+    dragMoved = false;
     quoteWrap.classList.add('dragging');
+    saveIcon.style.opacity = '1';
     document.addEventListener('mousemove', onDrag);
     document.addEventListener('mouseup', endDrag);
     document.addEventListener('touchmove', onDrag, { passive: false });
@@ -1436,6 +1518,10 @@
     e.preventDefault();
     wrapper.style.left = (dragState.left0 + dx) + 'px';
     wrapper.style.top  = (dragState.top0  + dy) + 'px';
+    const qc = quillCenter();
+    const wc = wrapperCenter();
+    dragState.dist = Math.hypot(wc.x - qc.x, wc.y - qc.y);
+    applyProximity(Math.max(0, 1 - dragState.dist / QUILL_INFLUENCE));
   }
 
   function endDrag() {
@@ -1444,8 +1530,16 @@
     document.removeEventListener('touchmove', onDrag);
     document.removeEventListener('touchend', endDrag);
     quoteWrap.classList.remove('dragging');
-    if (dragState && !dragState.moved) toggleSave();
+    if (!dragState) return;
+    const { moved, dist } = dragState;
+    dragMoved = moved;
     dragState = null;
+    if (!moved) { toggleSave(); return; }
+    if (dist < QUILL_SNAP) {
+      saveAndAdvance();
+    } else {
+      resetProximity();
+    }
   }
 
   quoteWrap.addEventListener('mousedown', startDrag);
@@ -1536,7 +1630,7 @@
     const dx = e.changedTouches[0].clientX - swipeStartX;
     const dy = e.changedTouches[0].clientY - swipeStartY;
     swipeStartX = null; swipeStartY = null;
-    if (dragState && dragState.moved) return;
+    if (dragMoved) { dragMoved = false; return; }
     if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
     if (dx < 0) goForward(); else goBack();
   }, { passive: true });
@@ -1546,9 +1640,73 @@
     if (e.code === 'ArrowLeft') { e.preventDefault(); goBack(); }
   });
 
+  // ── Font system ───────────────────────────────────────────────────────────
+  const FONTS = [
+    { family: 'Cormorant Garamond',  weight: '300', name: 'Cormorant Garamond' },
+    { family: 'Playfair Display',    weight: '400', name: 'Playfair Display' },
+    { family: 'EB Garamond',         weight: '400', name: 'EB Garamond' },
+    { family: 'Bodoni Moda',         weight: '400', name: 'Bodoni Moda' },
+    { family: 'Spectral',            weight: '400', name: 'Spectral' },
+    { family: 'Fraunces',            weight: '300', name: 'Fraunces' },
+    { family: 'Philosopher',         weight: '400', name: 'Philosopher' },
+    { family: 'Cardo',               weight: '400', name: 'Cardo' },
+    { family: 'Libre Baskerville',   weight: '400', name: 'Libre Baskerville' },
+    { family: 'Lora',                weight: '400', name: 'Lora' },
+  ];
+  const FONT_LOCK_KEY = 'font_lock_v1';
+  const fontLabel = document.getElementById('fontLabel');
+  const quoteTextEl = document.querySelector('.quote-text');
+  let currentFont = FONTS[Math.floor(Math.random() * FONTS.length)];
+  let fontLocked = false;
+
+  try {
+    const saved = localStorage.getItem(FONT_LOCK_KEY);
+    if (saved) {
+      const f = JSON.parse(saved);
+      const match = FONTS.find(x => x.family === f.family);
+      if (match) { currentFont = match; fontLocked = true; }
+    }
+  } catch {}
+
+  const LOCK_SVG = `<svg viewBox="0 0 11 13" width="9" height="11" fill="currentColor" style="vertical-align:middle;margin-bottom:1px"><rect x="1.5" y="5.5" width="8" height="7" rx="1.5"/><path d="M3.5 5.5V3.5a2 2 0 0 1 4 0v2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`;
+
+  function applyFont(font) {
+    currentFont = font;
+    quoteTextEl.style.fontFamily = `'${font.family}', Georgia, serif`;
+    quoteTextEl.style.fontWeight = font.weight;
+  }
+
+  function updateFontLabel() {
+    fontLabel.style.opacity = '0';
+    setTimeout(() => {
+      fontLabel.innerHTML = fontLocked ? LOCK_SVG : currentFont.name;
+      fontLabel.style.opacity = '';
+    }, 200);
+  }
+
+  function pickRandomFont() {
+    let next;
+    do { next = FONTS[Math.floor(Math.random() * FONTS.length)]; }
+    while (FONTS.length > 1 && next === currentFont);
+    return next;
+  }
+
+  fontLabel.addEventListener('click', () => {
+    fontLocked = !fontLocked;
+    try {
+      if (fontLocked) localStorage.setItem(FONT_LOCK_KEY, JSON.stringify({ family: currentFont.family }));
+      else localStorage.removeItem(FONT_LOCK_KEY);
+    } catch {}
+    updateFontLabel();
+  });
+
+  applyFont(currentFont);
+  updateFontLabel();
+
   // Call resetLinger, updateDot, and resetWrapperPosition after each quote change
   const _origShowQuote = showQuote;
   showQuote = async function(animate) {
+    if (!fontLocked) { applyFont(pickRandomFont()); updateFontLabel(); }
     resetLinger();
     resetWrapperPosition();
     await _origShowQuote(animate);
