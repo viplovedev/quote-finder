@@ -33,10 +33,13 @@
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
     }
     .wrapper {
-      position: relative; z-index: 3; width: 100%; max-width: 680px;
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      z-index: 3; width: min(680px, calc(100vw - 3rem));
       display: flex; flex-direction: column; align-items: center; gap: 2rem;
       text-align: center;
     }
+    .quote-wrap { cursor: grab; }
+    .quote-wrap.dragging { cursor: grabbing; }
     .header h1 {
       font-size: clamp(0.7rem,1.8vw,0.85rem);
       font-family: 'Helvetica Neue',Arial,sans-serif; font-weight: 400;
@@ -1397,8 +1400,56 @@
     else enterSavedMode();
   });
 
-  // Quote tap to save
-  document.querySelector('.quote-wrap').addEventListener('click', toggleSave);
+  // ── Draggable quote ──────────────────────────────────────────────────────
+  const wrapper = document.querySelector('.wrapper');
+  const quoteWrap = document.querySelector('.quote-wrap');
+  let dragState = null;
+
+  function resetWrapperPosition() {
+    wrapper.style.left = '';
+    wrapper.style.top = '';
+    wrapper.style.transform = '';
+  }
+
+  function startDrag(e) {
+    if (e.button !== undefined && e.button !== 0) return;
+    const pt = e.touches ? e.touches[0] : e;
+    const rect = wrapper.getBoundingClientRect();
+    wrapper.style.transform = 'none';
+    wrapper.style.left = rect.left + 'px';
+    wrapper.style.top = rect.top + 'px';
+    dragState = { x0: pt.clientX, y0: pt.clientY, left0: rect.left, top0: rect.top, moved: false };
+    quoteWrap.classList.add('dragging');
+    document.addEventListener('mousemove', onDrag);
+    document.addEventListener('mouseup', endDrag);
+    document.addEventListener('touchmove', onDrag, { passive: false });
+    document.addEventListener('touchend', endDrag);
+  }
+
+  function onDrag(e) {
+    if (!dragState) return;
+    const pt = e.touches ? e.touches[0] : e;
+    const dx = pt.clientX - dragState.x0;
+    const dy = pt.clientY - dragState.y0;
+    if (!dragState.moved && Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+    dragState.moved = true;
+    e.preventDefault();
+    wrapper.style.left = (dragState.left0 + dx) + 'px';
+    wrapper.style.top  = (dragState.top0  + dy) + 'px';
+  }
+
+  function endDrag() {
+    document.removeEventListener('mousemove', onDrag);
+    document.removeEventListener('mouseup', endDrag);
+    document.removeEventListener('touchmove', onDrag);
+    document.removeEventListener('touchend', endDrag);
+    quoteWrap.classList.remove('dragging');
+    if (dragState && !dragState.moved) toggleSave();
+    dragState = null;
+  }
+
+  quoteWrap.addEventListener('mousedown', startDrag);
+  quoteWrap.addEventListener('touchstart', startDrag, { passive: true });
 
   // ── Linger hint ──────────────────────────────────────────────────────────
   const LINGER_MS = 9000;
@@ -1485,6 +1536,7 @@
     const dx = e.changedTouches[0].clientX - swipeStartX;
     const dy = e.changedTouches[0].clientY - swipeStartY;
     swipeStartX = null; swipeStartY = null;
+    if (dragState && dragState.moved) return;
     if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
     if (dx < 0) goForward(); else goBack();
   }, { passive: true });
@@ -1494,10 +1546,11 @@
     if (e.code === 'ArrowLeft') { e.preventDefault(); goBack(); }
   });
 
-  // Call resetLinger and updateDot after each quote change
+  // Call resetLinger, updateDot, and resetWrapperPosition after each quote change
   const _origShowQuote = showQuote;
   showQuote = async function(animate) {
     resetLinger();
+    resetWrapperPosition();
     await _origShowQuote(animate);
   };
 
