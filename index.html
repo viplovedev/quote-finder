@@ -113,7 +113,29 @@
       color: rgba(255,255,255,0.25); letter-spacing: 0.06em;
       z-index: 10; pointer-events: none;
     }
-    /* Save icon */
+    /* First-visit nav hint */
+    #navHint {
+      position: fixed; bottom: 5.5rem; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 2.5rem;
+      font-family: 'Helvetica Neue',Arial,sans-serif; font-size: 0.65rem;
+      letter-spacing: 0.16em; text-transform: uppercase;
+      color: rgba(255,255,255,0.45);
+      text-shadow: 0 1px 6px rgba(0,0,0,0.8);
+      z-index: 10; pointer-events: none;
+      opacity: 0; transition: opacity 0.7s ease;
+    }
+    #navHint.show { opacity: 1; }
+    /* Saved label */
+    #saveLabel {
+      position: fixed; bottom: 3.8rem; right: 1.1rem;
+      font-family: 'Helvetica Neue',Arial,sans-serif; font-size: 0.58rem;
+      letter-spacing: 0.14em; text-transform: uppercase;
+      color: rgba(255,255,255,0.55);
+      text-shadow: 0 1px 6px rgba(0,0,0,0.8);
+      z-index: 20; pointer-events: none;
+      opacity: 0; transition: opacity 0.25s ease;
+    }
+    #saveLabel.show { opacity: 1; }
     /* Save icon (hidden, kept for saved-mode state on dot) */
     #saveIcon {
       position: fixed; bottom: 3.2rem; right: 1.7rem;
@@ -164,7 +186,9 @@
     <button class="back-btn" id="backBtn" aria-label="Previous quote" title="Previous quote">&#8249;</button>
     <button class="toggle" id="nextBtn" aria-label="Next quote" title="Next quote"></button>
   </div>
+  <div id="navHint"><span>‹ back</span><span>next ›</span></div>
   <div id="saveIcon"></div>
+  <span id="saveLabel">saved</span>
   <span id="saveHint">tap quote to save</span>
   <span id="saveFlash">✦</span>
   <span id="paintingCredit"></span>
@@ -1295,6 +1319,20 @@
   const saveIcon = document.getElementById('saveIcon');
   const saveHint = document.getElementById('saveHint');
   const saveFlash = document.getElementById('saveFlash');
+  const saveLabel = document.getElementById('saveLabel');
+  const navHint = document.getElementById('navHint');
+
+  // ── First-visit nav hint ─────────────────────────────────────────────────
+  const NAV_HINT_KEY = 'nav_hint_shown_v1';
+  if (!localStorage.getItem(NAV_HINT_KEY)) {
+    setTimeout(() => {
+      navHint.classList.add('show');
+      setTimeout(() => {
+        navHint.classList.remove('show');
+        try { localStorage.setItem(NAV_HINT_KEY, '1'); } catch {}
+      }, 3000);
+    }, 800);
+  }
 
   // ── Saves ────────────────────────────────────────────────────────────────
   const SAVE_KEY = 'quote_saves_v1';
@@ -1312,10 +1350,16 @@
     saveIcon.classList.toggle('saved-mode', savedMode);
   }
 
+  let saveLabelTimer = null;
   function flashSave(saved) {
     saveFlash.textContent = saved ? '✦' : '✧';
     saveFlash.classList.add('show');
     setTimeout(() => saveFlash.classList.remove('show'), 900);
+    if (saved) {
+      clearTimeout(saveLabelTimer);
+      saveLabel.classList.add('show');
+      saveLabelTimer = setTimeout(() => saveLabel.classList.remove('show'), 2000);
+    }
   }
 
   function toggleSave() {
@@ -1427,6 +1471,23 @@
 
   nextBtn.addEventListener('click', () => { if (!didLongPress) goForward(); });
   backBtn.addEventListener('click', goBack);
+
+  // ── Swipe gestures ───────────────────────────────────────────────────────
+  let swipeStartX = null;
+  let swipeStartY = null;
+  document.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    swipeStartX = e.touches[0].clientX;
+    swipeStartY = e.touches[0].clientY;
+  }, { passive: true });
+  document.addEventListener('touchend', e => {
+    if (swipeStartX === null) return;
+    const dx = e.changedTouches[0].clientX - swipeStartX;
+    const dy = e.changedTouches[0].clientY - swipeStartY;
+    swipeStartX = null; swipeStartY = null;
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    if (dx < 0) goForward(); else goBack();
+  }, { passive: true });
 
   document.addEventListener('keydown', e => {
     if (e.code === 'Space' || e.code === 'ArrowRight') { e.preventDefault(); goForward(); }
