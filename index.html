@@ -1,0 +1,1261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>A Light in the Dark</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --accent: #7c6af0; --accent-glow: rgba(124,106,240,0.3); }
+    html, body { height: 100%; }
+    body {
+      background-color: #000;
+      font-family: 'Georgia','Times New Roman',serif;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; min-height: 100vh;
+      padding: 2rem 1.5rem 8rem; overflow-x: hidden;
+    }
+    /* Full-screen painting */
+    #themeBg {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      opacity: 1; transition: opacity 0.4s ease;
+      background-size: cover; background-position: center;
+    }
+    #themeBg.fading { opacity: 0; }
+    /* Dark scrim so text stays legible over any painting */
+    #scrim {
+      position: fixed; inset: 0; z-index: 1; pointer-events: none;
+      background: rgba(0,0,0,0.52);
+    }
+    /* Film grain */
+    body::before {
+      content: ''; position: fixed; inset: 0; z-index: 2; pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+    }
+    .wrapper {
+      position: relative; z-index: 3; width: 100%; max-width: 680px;
+      display: flex; flex-direction: column; align-items: center; gap: 2rem;
+      text-align: center;
+    }
+    .header h1 {
+      font-size: clamp(0.7rem,1.8vw,0.85rem);
+      font-family: 'Helvetica Neue',Arial,sans-serif; font-weight: 400;
+      letter-spacing: 0.3em; text-transform: uppercase;
+      color: rgba(255,255,255,0.45);
+    }
+    /* Opening quote mark */
+    .quote-wrap { position: relative; }
+    .quote-wrap::before {
+      content: '\201C'; position: absolute; top: -1.8rem; left: -0.5rem;
+      font-size: 6rem; line-height: 1; color: rgba(255,255,255,0.12);
+      font-family: Georgia,serif; pointer-events: none; user-select: none;
+    }
+    .quote-text {
+      font-size: clamp(1.35rem,3.2vw,1.9rem);
+      line-height: 1.7; color: #fff; font-style: italic;
+      letter-spacing: 0.01em;
+      text-shadow: 0 2px 18px rgba(0,0,0,0.9), 0 1px 4px rgba(0,0,0,0.7);
+      opacity: 1; transform: translateY(0);
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+    .quote-text.fading { opacity: 0; transform: translateY(10px); }
+    .quote-author {
+      display: flex; align-items: center; justify-content: center; gap: 0.75rem;
+      opacity: 1; transform: translateY(0);
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+    .quote-author.fading { opacity: 0; transform: translateY(10px); }
+    .author-line { height: 1px; width: 28px; background: rgba(255,255,255,0.45); flex-shrink: 0; }
+    .author-name {
+      font-family: 'Helvetica Neue',Arial,sans-serif; font-size: 0.9rem;
+      font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
+      color: rgba(255,255,255,0.7);
+      text-shadow: 0 1px 8px rgba(0,0,0,0.8);
+    }
+    .counter {
+      font-family: 'Helvetica Neue',Arial,sans-serif; font-size: 0.72rem;
+      color: rgba(255,255,255,0.35); letter-spacing: 0.14em;
+    }
+    .toggle-wrap {
+      position: fixed; bottom: 3rem; left: 50%; transform: translateX(-50%);
+      display: flex; flex-direction: column; align-items: center; gap: 0.65rem; z-index: 10;
+    }
+    .toggle {
+      width: 72px; height: 38px; border-radius: 999px; border: none; cursor: pointer;
+      position: relative; padding: 0; outline: none; background: var(--accent);
+      box-shadow: 0 0 0 1px rgba(124,106,240,0.3), 0 4px 20px rgba(0,0,0,0.5), 0 0 16px var(--accent-glow);
+      transition: box-shadow 0.2s ease;
+    }
+    .toggle:hover { box-shadow: 0 0 0 1px rgba(124,106,240,0.6), 0 4px 24px rgba(0,0,0,0.5), 0 0 28px var(--accent-glow); }
+    .toggle:focus-visible { box-shadow: 0 0 0 3px rgba(124,106,240,0.6), 0 4px 20px rgba(0,0,0,0.5); }
+    .toggle::after {
+      content: ''; position: absolute; top: 4px; left: 4px;
+      width: 30px; height: 30px; border-radius: 50%; background: #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+      transform: translateX(34px);
+      transition: transform 0.15s cubic-bezier(0.4,0,0.2,1);
+    }
+    .toggle.switching::after { transform: translateX(0); }
+    .toggle:disabled { cursor: not-allowed; opacity: 0.55; }
+    #paintingCredit {
+      position: fixed; bottom: 0.6rem; right: 1rem;
+      font-family: 'Helvetica Neue',Arial,sans-serif; font-size: 0.6rem;
+      color: rgba(255,255,255,0.25); letter-spacing: 0.06em;
+      z-index: 10; pointer-events: none;
+    }
+    @media (max-width: 480px) { .quote-wrap::before { font-size: 4rem; } }
+  </style>
+</head>
+<body>
+  <div id="themeBg"></div>
+  <div id="scrim"></div>
+  <div class="wrapper">
+    <div class="quote-wrap" aria-live="polite" aria-atomic="true">
+      <p class="quote-text" id="quoteText"></p>
+      <div class="quote-author">
+        <span class="author-line"></span>
+        <span class="author-name" id="quoteAuthor"></span>
+      </div>
+    </div>
+  </div>
+  <div class="toggle-wrap">
+    <button class="toggle" id="nextBtn" aria-label="Next quote" title="Next quote"></button>
+  </div>
+  <span id="paintingCredit"></span>
+
+  <script>
+  // Art Institute of Chicago — free public API, public domain artworks
+  // Each quote has keywords (k) used to search the AIC for a matched painting.
+  // Results cached in localStorage so each painting fetches only once.
+  const Q = [
+    // ── HOPE ──────────────────────────────────────────────────────────────
+    {q:"Even the darkest night will end and the sun will rise.",a:"Victor Hugo",k:"sunrise dawn golden light landscape"},
+    {q:"Hope is the thing with feathers that perches in the soul.",a:"Emily Dickinson",k:"bird perched branch garden"},
+    {q:"We must accept finite disappointment, but never lose infinite hope.",a:"Martin Luther King Jr.",k:"horizon infinite open sky"},
+    {q:"In the middle of winter, I at last discovered that there was in me an invincible summer.",a:"Albert Camus",k:"winter sunlight snow landscape"},
+    {q:"Once you choose hope, anything's possible.",a:"Christopher Reeve",k:"open door light streaming"},
+    {q:"Hope is a waking dream.",a:"Aristotle",k:"dreamlike soft light figures"},
+    {q:"Where there is life, there is hope.",a:"Terence",k:"spring garden blooming flowers"},
+    {q:"Hope sees the invisible, feels the intangible, and achieves the impossible.",a:"Helen Keller",k:"radiant light breaking clouds"},
+    {q:"I find hope in the darkest of days, and focus in the brightest.",a:"Dalai Lama",k:"candle flame dark interior"},
+    {q:"There is always light. If only we're brave enough to see it.",a:"Amanda Gorman",k:"light piercing storm clouds"},
+    {q:"Hope begins in the dark, the stubborn hope that if you just show up and try to do the right thing, the dawn will come.",a:"Anne Lamott",k:"dark landscape dawn breaking"},
+    {q:"To hope means to be ready at every moment for that which is not yet born.",a:"Erich Fromm",k:"expectant figure window morning"},
+    {q:"May your choices reflect your hopes, not your fears.",a:"Nelson Mandela",k:"crossroads path open countryside"},
+    {q:"Everything will be okay in the end. If it's not okay, it's not the end.",a:"Unknown",k:"sunset tranquil peaceful meadow"},
+    {q:"The darkest hour has only sixty minutes.",a:"Morris Mandel",k:"last dark before dawn sky"},
+    {q:"My sun sets to rise again.",a:"Robert Browning",k:"setting sun sea horizon"},
+    {q:"Tough times never last, but tough people do.",a:"Robert H. Schuller",k:"strong figure standing storm"},
+    {q:"In three words I can sum up everything I've learned about life: it goes on.",a:"Robert Frost",k:"road winding onward landscape"},
+    {q:"There is no medicine like hope.",a:"Orison Swett Marden",k:"healing light garden peaceful"},
+    {q:"Shoot for the moon. Even if you miss, you'll land among the stars.",a:"Norman Vincent Peale",k:"night sky stars luminous"},
+    {q:"Out of difficulties grow miracles.",a:"Jean de La Bruyère",k:"flowers growing through stone"},
+    {q:"It always seems impossible until it's done.",a:"Nelson Mandela",k:"mountain summit reached figure"},
+    {q:"The present moment always will have been.",a:"Unknown",k:"still life timeless objects"},
+    {q:"Every sunrise is an invitation to brighten someone's day.",a:"Jhiess Krieg",k:"sunrise warm golden morning"},
+    {q:"When you get to the end of your rope, tie a knot and hang on.",a:"Franklin D. Roosevelt",k:"figure holding climbing rope"},
+    {q:"You do not find the happy life. You make it.",a:"Camilla E. Kimball",k:"craftsman hands creating"},
+    {q:"The sun himself is weak when he first rises, and gathers strength as the day gets on.",a:"Charles Dickens",k:"early morning sun misty"},
+    {q:"Even after all this time the sun never says to the earth, 'You owe me.' Look what happens with a love like that — it lights the whole sky.",a:"Hafiz",k:"sunlight illuminating landscape golden"},
+    {q:"Start by doing what's necessary; then do what's possible; and suddenly you are doing the impossible.",a:"Francis of Assisi",k:"steps climbing toward light"},
+    {q:"When you come to the end of your light, step into the darkness — either someone will be there to catch your hand, or you will learn to fly.",a:"Patrick Overton",k:"figure stepping toward light darkness"},
+    {q:"Despair is only for those who see the end beyond all doubt. We do not.",a:"J.R.R. Tolkien",k:"distant horizon open possibility"},
+    {q:"The world is full of magic things, patiently waiting for our senses to grow sharper.",a:"W.B. Yeats",k:"enchanted forest magical light"},
+    {q:"Blessed are those who plant trees under whose shade they will never sit.",a:"Nelson Henderson",k:"old tree shade generous"},
+    {q:"Hope is not a plan, but without hope there would be no plans.",a:"Unknown",k:"architect planning bright future"},
+    {q:"I am not afraid of tomorrow, for I have seen yesterday and I love today.",a:"William Allen White",k:"serene figure present moment"},
+    {q:"The very least you can do in your life is figure out what you hope for.",a:"Barbara Kingsolver",k:"figure gazing distant horizon"},
+    {q:"An optimist sees the opportunity in every difficulty.",a:"Winston Churchill",k:"light emerging from dark clouds"},
+    {q:"What would life be if we had no courage to attempt anything?",a:"Vincent van Gogh",k:"bold brushstroke expressive landscape"},
+    {q:"I can't change the direction of the wind, but I can adjust my sails.",a:"Jimmy Dean",k:"sailing ship adjusting sails"},
+    {q:"However long the night, the dawn will break.",a:"African Proverb",k:"dawn breaking over savanna"},
+    // ── DARKNESS & STARS ──────────────────────────────────────────────────
+    {q:"Stars can't shine without darkness.",a:"D.H. Sidebottom",k:"night sky stars brilliant"},
+    {q:"Only in the darkness can you see the stars.",a:"Martin Luther King Jr.",k:"deep night stars visible"},
+    {q:"The darker the night, the brighter the stars.",a:"Fyodor Dostoevsky",k:"clear night stars luminous field"},
+    {q:"The cosmos is within us. We are made of star stuff.",a:"Carl Sagan",k:"celestial astronomical nebula"},
+    {q:"Look up at the stars and not down at your feet.",a:"Stephen Hawking",k:"observer stargazing night"},
+    {q:"Dwell on the beauty of life. Watch the stars, and see yourself running with them.",a:"Marcus Aurelius",k:"stars running figures classical"},
+    {q:"Those who dream by day are cognizant of many things which escape those who only dream by night.",a:"Edgar Allan Poe",k:"dreaming figure daytime reverie"},
+    {q:"Moonlight drowns out all but the brightest stars.",a:"J.R.R. Tolkien",k:"moonlight night tranquil river"},
+    {q:"We are all of us stars, and we deserve to twinkle.",a:"Marilyn Monroe",k:"glittering night stars celebration"},
+    {q:"If the stars should appear one night in a thousand years, how would men believe and adore.",a:"Ralph Waldo Emerson",k:"starry night wonder figure"},
+    {q:"In the night of death, hope sees a star.",a:"Robert G. Ingersoll",k:"single star dark sky hope"},
+    {q:"There are nights when the wolves are silent and only the moon howls.",a:"George Carlin",k:"full moon howling night"},
+    {q:"Night is the other half of life, and the better half.",a:"Goethe",k:"night landscape blue dark romantic"},
+    {q:"To the stars, who listen. And the dreams that are answered.",a:"Sarah J. Maas",k:"stars listening dreaming figure"},
+    {q:"Keep your eyes on the stars and your feet on the ground.",a:"Theodore Roosevelt",k:"balance stars earth figure"},
+    {q:"The sky is the daily bread of the eyes.",a:"Ralph Waldo Emerson",k:"expanse of sky dramatic clouds"},
+    {q:"There is something haunting in the light of the moon.",a:"Joseph Conrad",k:"moonlit scene haunting nocturne"},
+    {q:"I have loved the stars too fondly to be fearful of the night.",a:"Sarah Williams",k:"astronomer loving stars night"},
+    {q:"Deep into that darkness peering, long I stood there, wondering, fearing, doubting.",a:"Edgar Allan Poe",k:"dark doorway figure peering"},
+    {q:"Every star you see in the night sky is bigger and brighter than our own sun.",a:"Unknown",k:"giant star cosmic scale"},
+    {q:"At night, when the sky is full of stars, I count my blessings.",a:"Unknown",k:"calm night stars blessings"},
+    {q:"Not all those who wander are lost.",a:"J.R.R. Tolkien",k:"wanderer night landscape path"},
+    {q:"You are a child of the universe, no less than the trees and the stars.",a:"Max Ehrmann",k:"figure trees stars universal"},
+    {q:"Reach high, for stars lie hidden in your soul.",a:"Pamela Vaull Starr",k:"figure reaching upward stars"},
+    {q:"Hitch your wagon to a star.",a:"Ralph Waldo Emerson",k:"wagon star night sky aspiring"},
+    {q:"Even the longest night ends at dawn.",a:"African Proverb",k:"long night ending dawn light"},
+    {q:"One can always be kind to people about whom one cares nothing.",a:"Oscar Wilde",k:"elegant figures kindness night"},
+    {q:"Quiet the mind and the soul will speak.",a:"Ma Jaya Sati Bhagavati",k:"quiet meditative night stillness"},
+    {q:"The night walked down the sky with the moon in her hand.",a:"Frederick L. Knowles",k:"personified night moon walking"},
+    {q:"We are the universe experiencing itself.",a:"Alan Watts",k:"cosmic consciousness universe figure"},
+    {q:"What is to give light must endure burning.",a:"Viktor Frankl",k:"flame enduring burning candle"},
+    {q:"She is a friend of night, who sings to keep the darkness at bay.",a:"Unknown",k:"woman singing night lantern"},
+    {q:"Stars are the scars of the universe.",a:"Ricky Maye",k:"scar stars universe poetic"},
+    {q:"The night is always darkest before the dawn, and the dawn is coming.",a:"Unknown",k:"predawn darkness approaching light"},
+    {q:"Even darkness must pass. A new day will come.",a:"J.R.R. Tolkien",k:"new day coming light landscape"},
+    {q:"I am not afraid of the dark. I am afraid of what walks in it.",a:"Unknown",k:"shadow figure dark corridor"},
+    {q:"The darker the night, the brighter I burn.",a:"Unknown",k:"bright flame dark surrounding"},
+    {q:"One day it will all make sense. For now, look at the stars.",a:"Unknown",k:"stars making sense night figure"},
+    {q:"Perhaps they are not stars, but rather openings in heaven where the love of our lost ones pours through.",a:"Eskimo Legend",k:"stars heaven love grief sky"},
+    {q:"I took a deep breath and listened to the old bray of my heart: I am, I am, I am.",a:"Sylvia Plath",k:"heartbeat pulse life dark"},
+    // ── DAWN & NEW BEGINNINGS ─────────────────────────────────────────────
+    {q:"Every moment is a fresh beginning.",a:"T.S. Eliot",k:"morning dew fresh flowers"},
+    {q:"Every day is a new page in your story.",a:"Unknown",k:"open book morning light"},
+    {q:"With the new day comes new strength and new thoughts.",a:"Eleanor Roosevelt",k:"woman morning resolve strength"},
+    {q:"Today is the first day of the rest of your life.",a:"Abbie Hoffman",k:"sunrise first light morning"},
+    {q:"The beginning is always today.",a:"Mary Shelley",k:"today present moment dawn"},
+    {q:"No matter how hard the past, you can always begin again.",a:"Buddha",k:"fresh start spring morning"},
+    {q:"It is never too late to be what you might have been.",a:"George Eliot",k:"late bloomer flower garden"},
+    {q:"What if I fall? But my darling, what if you fly?",a:"Erin Hanson",k:"bird taking flight cliff"},
+    {q:"Life is not measured by the number of breaths we take, but by the moments that take our breath away.",a:"Maya Angelou",k:"breathtaking sunrise mountain"},
+    {q:"The secret of getting ahead is getting started.",a:"Mark Twain",k:"figure taking first step path"},
+    {q:"Do not wait to strike till the iron is hot; but make it hot by striking.",a:"William Butler Yeats",k:"blacksmith forge fire striking"},
+    {q:"Finish each day and be done with it.",a:"Ralph Waldo Emerson",k:"day ending peaceful sunset"},
+    {q:"Each new day is a blank page in the diary of your life.",a:"Douglas Pagels",k:"blank page morning light desk"},
+    {q:"You are never too old to set another goal or dream a new dream.",a:"C.S. Lewis",k:"elder figure new dream horizon"},
+    {q:"The first step is you have to say that you can.",a:"Will Smith",k:"first step forward figure path"},
+    {q:"Let your life lightly dance on the edges of time.",a:"Rabindranath Tagore",k:"dancing figure light graceful"},
+    {q:"Life is not about finding yourself. Life is about creating yourself.",a:"George Bernard Shaw",k:"sculptor creating figure clay"},
+    {q:"The morning will come in the blink of an eye, and you won't regret a night you spent working.",a:"Unknown",k:"morning after work sunrise"},
+    {q:"Your life is your story. Write well. Edit often.",a:"Susan Statham",k:"writing pen journal morning"},
+    {q:"Morning is an important time of day, because how you spend your morning can often tell you what kind of day you are going to have.",a:"Lemony Snicket",k:"morning ritual calm peaceful"},
+    {q:"Lose an hour in the morning, and you will spend all day looking for it.",a:"Richard Whately",k:"morning hour sunrise important"},
+    {q:"Every sunrise brings a new day full of new hopes for a better tomorrow.",a:"Debasish Mridha",k:"sunrise hope new day"},
+    {q:"This is a new year. A new beginning. And things will change.",a:"Taylor Swift",k:"new year new beginning fresh"},
+    {q:"New beginnings are often disguised as painful endings.",a:"Lao Tzu",k:"ending becoming beginning"},
+    {q:"Every end is just a new beginning.",a:"Marianne Williamson",k:"cycle ending beginning nature"},
+    {q:"When one door closes, another opens.",a:"Alexander Graham Bell",k:"door opening new light"},
+    {q:"Embrace uncertainty. Some of the most beautiful chapters in our lives won't have a title until much later.",a:"Bob Goff",k:"unwritten chapter morning uncertainty"},
+    {q:"You have brains in your head. You have feet in your shoes. You can steer yourself any direction you choose.",a:"Dr. Seuss",k:"journey beginning first step"},
+    {q:"Begin at the beginning, and go on till you come to the end.",a:"Lewis Carroll",k:"beginning end journey path"},
+    {q:"Each day is a little life; every waking and rising a little birth.",a:"Arthur Schopenhauer",k:"morning waking birth light"},
+    {q:"Opportunities are like sunrises. If you wait too long, you miss them.",a:"William Arthur Ward",k:"sunrise opportunity seize morning"},
+    {q:"Do something today that your future self will thank you for.",a:"Sean Patrick Flanery",k:"future self gratitude action"},
+    {q:"The future belongs to those who believe in the beauty of their dreams.",a:"Eleanor Roosevelt",k:"dreamer future beauty hope"},
+    {q:"Yesterday is history. Tomorrow is a mystery. Today is a gift.",a:"Alice Morse Earle",k:"present moment gift today"},
+    {q:"Start where you are. Use what you have. Do what you can.",a:"Arthur Ashe",k:"starting point present moment"},
+    {q:"The journey of a thousand miles begins with one step.",a:"Lao Tzu",k:"single step path beginning"},
+    {q:"You don't have to see the whole staircase, just take the first step.",a:"Martin Luther King Jr.",k:"staircase first step faith"},
+    {q:"Well begun is half done.",a:"Aristotle",k:"good beginning morning work"},
+    {q:"Life can only be understood backwards; but it must be lived forwards.",a:"Søren Kierkegaard",k:"looking forward path life"},
+    {q:"Tomorrow is always fresh, with no mistakes in it yet.",a:"L.M. Montgomery",k:"fresh morning snow no mistakes"},
+    // ── STORMS & ADVERSITY ────────────────────────────────────────────────
+    {q:"Rock bottom became the solid foundation on which I rebuilt my life.",a:"J.K. Rowling",k:"ruins foundation rebuilding"},
+    {q:"The world breaks everyone, and afterward, some are strong at the broken places.",a:"Ernest Hemingway",k:"broken mended strong pottery"},
+    {q:"Storms make trees take deeper roots.",a:"Dolly Parton",k:"tree storm wind roots deep"},
+    {q:"When you come out of the storm, you won't be the same person who walked in.",a:"Haruki Murakami",k:"storm sea emerging changed"},
+    {q:"Life is not about waiting for the storm to pass, but learning to dance in the rain.",a:"Vivian Greene",k:"dancing rain figures joyful"},
+    {q:"If you are going through hell, keep going.",a:"Winston Churchill",k:"dark passage keep moving forward"},
+    {q:"Turn your wounds into wisdom.",a:"Oprah Winfrey",k:"wound scar healed wisdom"},
+    {q:"The gem cannot be polished without friction, nor man perfected without trials.",a:"Chinese Proverb",k:"gem polishing friction refining"},
+    {q:"A smooth sea never made a skilled sailor.",a:"Franklin D. Roosevelt",k:"rough sea sailor skilled waves"},
+    {q:"Into each life some rain must fall.",a:"Henry Wadsworth Longfellow",k:"rain falling life acceptance"},
+    {q:"Adversity is the first path to truth.",a:"Lord Byron",k:"adversity path truth rocky"},
+    {q:"Hardships often prepare ordinary people for an extraordinary destiny.",a:"C.S. Lewis",k:"ordinary person extraordinary destiny"},
+    {q:"The oak fought the wind and was broken, the willow bent when it must and survived.",a:"Robert Jordan",k:"oak willow wind bending surviving"},
+    {q:"Prosperity makes friends, adversity tries them.",a:"Publilius Syrus",k:"adversity testing friendship"},
+    {q:"In the middle of every difficulty lies opportunity.",a:"Albert Einstein",k:"difficulty opportunity hidden light"},
+    {q:"I have not failed. I've just found ten thousand ways that won't work.",a:"Thomas Edison",k:"inventor persistence laboratory"},
+    {q:"That which does not kill us, makes us stronger.",a:"Friedrich Nietzsche",k:"survivor stronger after ordeal"},
+    {q:"Pain is temporary. Quitting lasts forever.",a:"Lance Armstrong",k:"pain endurance athlete persisting"},
+    {q:"Every adversity, every failure, every heartache carries with it the seed of an equal or greater benefit.",a:"Napoleon Hill",k:"seed sprouting adversity benefit"},
+    {q:"The human capacity for burden is like bamboo — far more flexible than you'd ever believe.",a:"Jodi Picoult",k:"bamboo bending storm flexible"},
+    {q:"Smooth roads never make good drivers; smooth seas never make good sailors; clear skies never make good pilots.",a:"Unknown",k:"rough terrain driver skilled"},
+    {q:"The struggle you're in today is developing the strength you need for tomorrow.",a:"Robert Tew",k:"struggle developing strength figure"},
+    {q:"I survived because the fire inside me burned brighter than the fire around me.",a:"Unknown",k:"inner fire burning bright surrounding"},
+    {q:"When everything seems to be going against you, remember that the airplane takes off against the wind.",a:"Henry Ford",k:"airplane taking off against wind"},
+    {q:"Don't be pushed around by the fears in your mind. Be led by the dreams in your heart.",a:"Roy T. Bennett",k:"dream leading heart courage"},
+    {q:"It is during our darkest moments that we must focus to see the light.",a:"Aristotle",k:"darkest moment light focus"},
+    {q:"You were given this life because you are strong enough to live it.",a:"Unknown",k:"strong figure life given"},
+    {q:"The wound is the place where the Light enters you.",a:"Rumi",k:"wound light entering mystical"},
+    {q:"What lies behind us and what lies before us are tiny matters compared to what lies within us.",a:"Ralph Waldo Emerson",k:"inner strength within figure"},
+    {q:"Fall seven times, stand up eight.",a:"Japanese Proverb",k:"standing up fallen rising"},
+    {q:"Even the darkest night has stars.",a:"Victor Hugo",k:"dark night stars visible hope"},
+    {q:"There is no education like adversity.",a:"Benjamin Disraeli",k:"education adversity lessons life"},
+    {q:"When the storm is over, not all birds that were silent during the storm will sing.",a:"African Proverb",k:"after storm some birds silent"},
+    {q:"Courage is not the absence of fear, but the triumph over it.",a:"Nelson Mandela",k:"courage triumph over fear"},
+    {q:"Pressure is a privilege — it only comes to those who earn it.",a:"Billie Jean King",k:"pressure privilege earned athlete"},
+    {q:"Out of suffering have emerged the strongest souls.",a:"Kahlil Gibran",k:"suffering emerging strongest soul"},
+    {q:"Every storm runs out of rain.",a:"Maya Angelou",k:"storm ending clearing sky"},
+    {q:"The lotus flower blooms most beautifully from the deepest mud.",a:"Buddhist Proverb",k:"lotus bloom mud water"},
+    {q:"He knows not his own strength that hath not met adversity.",a:"Ben Jonson",k:"unknown strength adversity revealing"},
+    {q:"Through every dark night, there is a bright day after that.",a:"Tupac Shakur",k:"bright day after dark night"},
+    // ── STRENGTH & COURAGE ────────────────────────────────────────────────
+    {q:"You are braver than you believe, stronger than you seem, and smarter than you think.",a:"A.A. Milne",k:"brave strong smart figure child"},
+    {q:"Courage is not the absence of fear, but the judgment that something else is more important.",a:"Ambrose Redmoon",k:"courage judgment fear important"},
+    {q:"Courage doesn't always roar. Sometimes courage is the quiet voice at the end of the day saying, 'I will try again tomorrow.'",a:"Mary Anne Radmacher",k:"quiet courage small voice"},
+    {q:"The secret to getting ahead is getting started.",a:"Mark Twain",k:"bold start figure stepping forward"},
+    {q:"Be strong enough to stand alone, smart enough to know when you need help.",a:"Unknown",k:"solitary strong figure standing"},
+    {q:"Strength does not come from winning. Your struggles develop your strength.",a:"Arnold Schwarzenegger",k:"struggle developing strength labor"},
+    {q:"It is not the mountain we conquer, but ourselves.",a:"Edmund Hillary",k:"mountaineer summit conquered self"},
+    {q:"You have power over your mind, not outside events. Realize this, and you will find strength.",a:"Marcus Aurelius",k:"stoic figure mind power strength"},
+    {q:"Believe you can and you're halfway there.",a:"Theodore Roosevelt",k:"belief confidence halfway there"},
+    {q:"You gain strength, courage, and confidence by every experience in which you really stop to look fear in the face.",a:"Eleanor Roosevelt",k:"woman facing fear confidence"},
+    {q:"The brave man is not he who does not feel afraid, but he who conquers that fear.",a:"Nelson Mandela",k:"brave conquering fear figure"},
+    {q:"Do not pray for easy lives. Pray to be stronger men.",a:"John F. Kennedy",k:"prayer strength harder better"},
+    {q:"Life shrinks or expands in proportion to one's courage.",a:"Anais Nin",k:"expanding life courage proportion"},
+    {q:"A hero is an ordinary individual who finds the strength to persevere.",a:"Christopher Reeve",k:"ordinary hero persevering strength"},
+    {q:"With the new day comes new strength and new thoughts.",a:"Eleanor Roosevelt",k:"new day strength woman morning"},
+    {q:"Inaction breeds doubt and fear. Action breeds confidence and courage.",a:"Dale Carnegie",k:"action confidence courage movement"},
+    {q:"He who has a why to live for can bear almost any how.",a:"Friedrich Nietzsche",k:"purpose why bearing burden"},
+    {q:"The weak can never forgive. Forgiveness is the attribute of the strong.",a:"Mahatma Gandhi",k:"forgiveness strength wisdom figure"},
+    {q:"True strength is keeping everything together when everyone expects you to fall apart.",a:"Unknown",k:"together strength composure storm"},
+    {q:"Sometimes the smallest step in the right direction ends up being the biggest step of your life.",a:"Emma Stone",k:"small step right direction path"},
+    {q:"Where there is a will, there is a way.",a:"William Hazlitt",k:"determination will path forward"},
+    {q:"The most courageous act is still to think for yourself. Aloud.",a:"Coco Chanel",k:"thinking yourself courageous aloud"},
+    {q:"Stand up and walk. Keep moving forward.",a:"Hiromu Arakawa",k:"standing walking forward movement"},
+    {q:"Out of every hundred men, ten shouldn't even be there, eighty are just targets, nine are the real fighters, and we are lucky to have them, for they make the battle. Ah, but the one — one is a warrior.",a:"Heraclitus",k:"warrior one fighter battle noble"},
+    {q:"The strongest people are not those who show strength in front of us but those who win battles we know nothing about.",a:"Unknown",k:"hidden battle strength private"},
+    {q:"I am not afraid of an army of lions led by a sheep; I am afraid of an army of sheep led by a lion.",a:"Alexander the Great",k:"lion leadership strength courage"},
+    {q:"Difficulties mastered are opportunities won.",a:"Winston Churchill",k:"difficulty mastered opportunity won"},
+    {q:"Do the difficult things while they are easy and do the great things while they are small.",a:"Lao Tzu",k:"difficult easy small great wisdom"},
+    {q:"You must do the thing you think you cannot do.",a:"Eleanor Roosevelt",k:"impossible becoming possible courage"},
+    {q:"The first virtue in a soldier is endurance of fatigue; courage is only the second virtue.",a:"Napoleon Bonaparte",k:"soldier endurance fatigue courage"},
+    {q:"Keep your face always toward the sunshine, and shadows will fall behind you.",a:"Walt Whitman",k:"face toward sunshine shadows behind"},
+    {q:"I am not afraid of storms, for I am learning how to sail my ship.",a:"Louisa May Alcott",k:"woman learning sailing storm"},
+    {q:"Knowing what must be done does away with fear.",a:"Rosa Parks",k:"knowing purpose fear vanishes"},
+    {q:"Life is either a daring adventure or nothing at all.",a:"Helen Keller",k:"daring adventure life bold"},
+    {q:"Be the change you wish to see in the world.",a:"Mahatma Gandhi",k:"change figure world transformation"},
+    {q:"Act as if what you do makes a difference. It does.",a:"William James",k:"action difference meaningful figure"},
+    {q:"Nothing in life is to be feared, only to be understood.",a:"Marie Curie",k:"scientist understanding not fearing"},
+    {q:"The only way out is through.",a:"Robert Frost",k:"through the difficulty path forward"},
+    {q:"You have to have a dream so you can get up in the morning.",a:"Billy Wilder",k:"morning dream getting up purposeful"},
+    {q:"Endure and persist; this pain will turn to your good by and by.",a:"Ovid",k:"endure persist pain turning good"},
+    // ── RESILIENCE & RECOVERY ─────────────────────────────────────────────
+    {q:"You may encounter many defeats, but you must not be defeated.",a:"Maya Angelou",k:"encounter defeat rising undefeated"},
+    {q:"One small crack does not mean that you are broken.",a:"Linda Poindexter",k:"crack mended kintsugi gold"},
+    {q:"The human spirit is stronger than anything that can happen to it.",a:"C.C. Scott",k:"human spirit unbreakable strong"},
+    {q:"Although the world is full of suffering, it is also full of the overcoming of it.",a:"Helen Keller",k:"suffering overcoming light world"},
+    {q:"It's not whether you get knocked down; it's whether you get up.",a:"Vince Lombardi",k:"knocked down getting up figure"},
+    {q:"Rise up, start fresh, see the bright opportunity in each new day.",a:"Unknown",k:"rising fresh bright opportunity day"},
+    {q:"Our greatest glory is not in never falling, but in rising every time we fall.",a:"Confucius",k:"rising every fall glory"},
+    {q:"Blessed are the hearts that can bend; they shall never be broken.",a:"Albert Camus",k:"bending heart never breaking"},
+    {q:"We delight in the beauty of the butterfly, but rarely admit the changes it has gone through to achieve that beauty.",a:"Maya Angelou",k:"butterfly transformation beauty change"},
+    {q:"Recovery is not one and done. It is a lifelong journey.",a:"Unknown",k:"lifelong journey recovery path"},
+    {q:"You don't have to be positive all the time. It's perfectly okay to feel sad, angry, annoyed, or frustrated. Having feelings doesn't make you a negative person.",a:"Lori Deschene",k:"feelings acceptance healing human"},
+    {q:"Healing takes time. And asking for help is a courageous step.",a:"Mariska Hargitay",k:"healing time courage asking help"},
+    {q:"Scars are just another kind of strength.",a:"Unknown",k:"scar strength beauty mark"},
+    {q:"Rock bottom is good, solid ground, and a dead end becomes a turning point.",a:"Dalai Lama",k:"turning point dead end new direction"},
+    {q:"Just when the caterpillar thought the world was over, it became a butterfly.",a:"Unknown",k:"caterpillar transformation butterfly"},
+    {q:"After the rain, the sun will reappear. There is life. After the pain, the joy will still be here.",a:"Walt Disney",k:"after rain sun reappear joy"},
+    {q:"You've survived 100% of your worst days.",a:"Unknown",k:"survived every worst day strong"},
+    {q:"No matter how you feel: get up, dress up, show up, and never give up.",a:"Unknown",k:"getting up dressing showing up"},
+    {q:"This too shall pass.",a:"Persian Proverb",k:"passing moment impermanence stone"},
+    {q:"If it were easy, you wouldn't grow.",a:"Unknown",k:"difficulty growth stretch forward"},
+    {q:"Life will break you. Nobody can protect you from that, and living alone won't either, for solitude will also break you with its yearning.",a:"Louise Erdrich",k:"broken solitude yearning figure"},
+    {q:"The pain that you've been feeling, can't compare to the joy that's coming.",a:"Romans 8:18",k:"pain joy coming future light"},
+    {q:"We must be willing to let go of the life we planned so as to have the life that is waiting for us.",a:"Joseph Campbell",k:"letting go planned life waiting"},
+    {q:"Brokenness is the beginning of wholeness.",a:"Unknown",k:"broken becoming whole healing"},
+    {q:"Resilience is the capacity to recover quickly from difficulties.",a:"Unknown",k:"quickly recovering difficulty elastic"},
+    {q:"Sometimes you have to go through the worst to get to the best.",a:"Unknown",k:"worst to best passage journey"},
+    {q:"It's okay to not be okay.",a:"Unknown",k:"not okay acceptance gentle"},
+    {q:"If you fell down yesterday, stand up today.",a:"H.G. Wells",k:"standing up yesterday today"},
+    {q:"You are allowed to be both a masterpiece and a work in progress simultaneously.",a:"Sophia Bush",k:"masterpiece work progress duality"},
+    {q:"Every setback is a setup for a comeback.",a:"Joel Osteen",k:"setback comeback stronger"},
+    {q:"Turn your cant's into cans and your dreams into plans.",a:"Gabrielle Bernstein",k:"dreams into plans transformation"},
+    {q:"We are not defined by our struggles, but by how we rise from them.",a:"Unknown",k:"rising struggles definition growth"},
+    {q:"Let your past make you better, not bitter.",a:"Unknown",k:"past better not bitter growth"},
+    {q:"Peace does not mean to be in a place where there is no noise, trouble, or hard work. It means to be in the midst of those things and still be calm in your heart.",a:"Unknown",k:"peace midst difficulty calm"},
+    {q:"Life is not always what we want it to be, but it's what we make of it.",a:"Unknown",k:"making best of life craft"},
+    {q:"What I know for sure is that speaking your truth is the most powerful tool we all have.",a:"Oprah Winfrey",k:"speaking truth power tool"},
+    {q:"In the depth of winter, I finally learned that within me there lay an invincible summer.",a:"Albert Camus",k:"winter depth invincible summer within"},
+    {q:"The bamboo that bends is stronger than the oak that resists.",a:"Japanese Proverb",k:"bamboo bending stronger than oak"},
+    {q:"What makes you different or weird — that's your strength.",a:"Meryl Streep",k:"different weird strength unique"},
+    {q:"Be patient with yourself. Self-growth is tender; it's holy ground.",a:"Stephen Covey",k:"patient self growth tender holy"},
+    // ── GROWTH & CHANGE ───────────────────────────────────────────────────
+    {q:"Growth is painful. Change is painful. But nothing is as painful as staying stuck somewhere you don't belong.",a:"Mandy Hale",k:"growth change painful belonging"},
+    {q:"Be not afraid of growing slowly, be afraid only of standing still.",a:"Chinese Proverb",k:"growing slowly movement forward"},
+    {q:"What we fear doing most is usually what we most need to do.",a:"Tim Ferriss",k:"fear doing most needed action"},
+    {q:"The only way to make sense out of change is to plunge into it.",a:"Alan Watts",k:"plunging into change river current"},
+    {q:"Change is inevitable. Growth is optional.",a:"John C. Maxwell",k:"inevitable change optional growth"},
+    {q:"Life is change. Growth is optional. Choose wisely.",a:"Karen Kaiser Clark",k:"choosing growth wisely life"},
+    {q:"Progress is impossible without change, and those who cannot change their minds cannot change anything.",a:"George Bernard Shaw",k:"progress change minds necessary"},
+    {q:"Become who you are.",a:"Friedrich Nietzsche",k:"becoming yourself authentic figure"},
+    {q:"You cannot swim for new horizons until you have courage to lose sight of the shore.",a:"William Faulkner",k:"swimmer new horizons losing shore"},
+    {q:"In every change, in every falling leaf there is some pain, some beauty.",a:"Leo Tolstoy",k:"falling leaf pain beauty autumn"},
+    {q:"There is nothing permanent except change.",a:"Heraclitus",k:"impermanence change river flow"},
+    {q:"Growth and comfort do not coexist.",a:"Ginni Rometty",k:"growth comfort coexist contrast"},
+    {q:"It is not the strongest of the species that survives, nor the most intelligent, but the one most responsive to change.",a:"Charles Darwin",k:"adaptable species surviving change"},
+    {q:"Education is the most powerful weapon which you can use to change the world.",a:"Nelson Mandela",k:"education weapon changing world"},
+    {q:"You cannot step into the same river twice.",a:"Heraclitus",k:"river flowing same twice change"},
+    {q:"The secret of change is to focus all of your energy not on fighting the old, but on building the new.",a:"Socrates",k:"building new not fighting old"},
+    {q:"The only time you should ever look back is to see how far you've come.",a:"Unknown",k:"looking back how far come"},
+    {q:"People grow through experience if they meet life honestly and courageously.",a:"Eleanor Roosevelt",k:"growing through experience honestly"},
+    {q:"A year from now you may wish you had started today.",a:"Karen Lamb",k:"starting today future wish"},
+    {q:"In three words I can sum up everything I've learned about life: it goes on.",a:"Robert Frost",k:"life going on simple profound"},
+    {q:"You change the world by being yourself.",a:"Yoko Ono",k:"yourself changing world authentic"},
+    {q:"Changing yourself means changing the world.",a:"Unknown",k:"inner change outer world transform"},
+    {q:"What you think, you become. What you feel, you attract. What you imagine, you create.",a:"Buddha",k:"thought feeling creation imagination"},
+    {q:"The measure of intelligence is the ability to change.",a:"Albert Einstein",k:"intelligence flexibility changing adapt"},
+    {q:"Transformation is a process, and as life happens there are tons of ups and downs.",a:"Rick Warren",k:"transformation process ups downs"},
+    {q:"We don't grow when things are easy; we grow when we face challenges.",a:"Joyce Meyer",k:"growing challenges facing difficult"},
+    {q:"The snake that cannot shed its skin must die.",a:"Friedrich Nietzsche",k:"snake shedding skin transformation"},
+    {q:"You are today where your thoughts have brought you; you will be tomorrow where your thoughts take you.",a:"James Allen",k:"thoughts destination future past"},
+    {q:"Sometimes things fall apart so that better things can fall together.",a:"Marilyn Monroe",k:"falling apart better together"},
+    {q:"Not all who wander are lost, and not all who are lost wander.",a:"Unknown",k:"wandering lost found purpose"},
+    {q:"Turn the page.",a:"Unknown",k:"turning page new chapter book"},
+    {q:"Seeds of great discovery are constantly floating around us, but they only take root in minds well-prepared to receive them.",a:"Joseph Henry",k:"seeds ideas floating taking root"},
+    {q:"Great things never came from comfort zones.",a:"Roy T. Bennett",k:"comfort zone outside great things"},
+    {q:"The caterpillar only travels so far before it must stop and change.",a:"Unknown",k:"caterpillar stopping changing process"},
+    {q:"Change before you have to.",a:"Jack Welch",k:"proactive change ahead necessity"},
+    {q:"We can't become what we need to be by remaining what we are.",a:"Oprah Winfrey",k:"remaining becoming transformation need"},
+    {q:"Adaptability is not imitation. It means power of resistance and assimilation.",a:"Mahatma Gandhi",k:"adaptability resistance assimilation power"},
+    {q:"Everything changes, and everything stays the same.",a:"Unknown",k:"paradox change sameness river"},
+    {q:"Yesterday I was clever, so I wanted to change the world. Today I am wise, so I am changing myself.",a:"Rumi",k:"wisdom changing oneself not world"},
+    {q:"Become comfortable with not knowing what's next.",a:"Unknown",k:"comfortable unknown next mystery"},
+    // ── NATURE & SEASONS ──────────────────────────────────────────────────
+    {q:"In every walk with nature, one receives far more than he seeks.",a:"John Muir",k:"walking nature receiving forest"},
+    {q:"The earth has music for those who listen.",a:"William Shakespeare",k:"earth music listening nature"},
+    {q:"Look deep into nature, and then you will understand everything better.",a:"Albert Einstein",k:"deep nature understanding forest"},
+    {q:"The clearest way into the Universe is through a forest wilderness.",a:"John Muir",k:"forest wilderness universe path"},
+    {q:"In all things of nature there is something of the marvelous.",a:"Aristotle",k:"marvelous nature detail wonder"},
+    {q:"Adopt the pace of nature: her secret is patience.",a:"Ralph Waldo Emerson",k:"nature patience slow seasons"},
+    {q:"The butterfly counts not months but moments, and has time enough.",a:"Rabindranath Tagore",k:"butterfly moments time enough"},
+    {q:"One touch of nature makes the whole world kin.",a:"William Shakespeare",k:"touch nature kindred world"},
+    {q:"To forget how to dig the earth and to tend the soil is to forget ourselves.",a:"Mahatma Gandhi",k:"digging earth tending soil hands"},
+    {q:"The poetry of the earth is never dead.",a:"John Keats",k:"earth poetry never dead alive"},
+    {q:"Autumn is a second spring when every leaf is a flower.",a:"Albert Camus",k:"autumn leaves flower second spring"},
+    {q:"Spring is nature's way of saying, 'Let's party!'",a:"Robin Williams",k:"spring nature celebration blooming"},
+    {q:"Sunshine is delicious, rain is refreshing, wind braces us up, snow is exhilarating.",a:"John Ruskin",k:"sunshine rain wind snow seasons"},
+    {q:"I believe a leaf of grass is no less than the journey-work of the stars.",a:"Walt Whitman",k:"grass leaf stars journey work"},
+    {q:"Nature is not a place to visit. It is home.",a:"Gary Snyder",k:"nature home belonging place"},
+    {q:"The mountains are calling and I must go.",a:"John Muir",k:"mountains calling must go"},
+    {q:"Wilderness is not a luxury but a necessity of the human spirit.",a:"Edward Abbey",k:"wilderness necessity human spirit"},
+    {q:"If you truly love nature, you will find beauty everywhere.",a:"Vincent van Gogh",k:"nature beauty everywhere found"},
+    {q:"Forests would be silent if no bird sang there except the one that sang best.",a:"Henry Van Dyke",k:"forest birds singing each voice"},
+    {q:"Those who contemplate the beauty of the earth find reserves of strength that will endure.",a:"Rachel Carson",k:"beauty earth contemplating strength"},
+    {q:"What is the good of your stars and trees, your sunrise and the wind, if they do not enter into our daily lives?",a:"E.M. Forster",k:"stars trees sunrise wind daily"},
+    {q:"Plant seeds of happiness, hope, success, and love; it will all come back to you in abundance.",a:"Steve Maraboli",k:"planting seeds abundance harvest"},
+    {q:"The mountains are not stadiums where I satisfy my ambition to achieve, they are cathedrals where I practice my religion.",a:"Anatoli Boukreev",k:"mountain cathedral religion practice"},
+    {q:"All good things are wild and free.",a:"Henry David Thoreau",k:"wild free good things nature"},
+    {q:"Everything is connected to everything else.",a:"Barry Commoner",k:"connected everything ecosystem web"},
+    {q:"Live in each season as it passes; breathe the air, drink the drink, taste the fruit.",a:"Henry David Thoreau",k:"season passing breathing tasting living"},
+    {q:"The goal of life is to make your heartbeat match the beat of the universe.",a:"Joseph Campbell",k:"heartbeat universe matching rhythm"},
+    {q:"Heaven is under our feet as well as over our heads.",a:"Henry David Thoreau",k:"heaven under feet above heads"},
+    {q:"To walk in nature is to witness a thousand miracles.",a:"Mary Davis",k:"walking nature thousand miracles"},
+    {q:"The trees are about to show us how lovely it is to let dead things go.",a:"Unknown",k:"trees autumn letting go lovely"},
+    {q:"There's no Wi-Fi in the forest, but you'll find a better connection.",a:"Unknown",k:"forest connection better nature"},
+    {q:"A flower does not think of competing with the flower next to it. It just blooms.",a:"Zen Shin",k:"flower blooming competing not"},
+    {q:"The tallest trees are most in the power of the winds.",a:"Thomas Fuller",k:"tall trees wind power exposed"},
+    {q:"Keep close to Nature's heart, and break clear away once in a while.",a:"John Muir",k:"nature heart breaking away clear"},
+    {q:"Study nature, love nature, stay close to nature. It will never fail you.",a:"Frank Lloyd Wright",k:"studying loving staying nature close"},
+    {q:"The sun does not shine for a few trees and flowers, but for the wide world's joy.",a:"Henry Ward Beecher",k:"sun wide world joy trees"},
+    {q:"Every flower must grow through dirt.",a:"Laurie Jean Sennott",k:"flower growing through dirt"},
+    {q:"The oak trees don't know they are enduring; they just grow.",a:"Unknown",k:"oak trees enduring growing silent"},
+    {q:"Wild rivers are earth's renegades, defying gravity, dancing to their own tunes.",a:"Richard Bangs",k:"wild river renegade dancing free"},
+    {q:"What a joy it is to feel the soft, springy earth under my feet once more.",a:"Helen Keller",k:"soft earth underfoot joy spring"},
+    // ── JOURNEY & PERSEVERANCE ────────────────────────────────────────────
+    {q:"It does not matter how slowly you go as long as you do not stop.",a:"Confucius",k:"slowly going forward not stopping"},
+    {q:"You have been assigned this mountain so you can show others it can be moved.",a:"Mel Robbins",k:"mountain assigned moving showing"},
+    {q:"The road to success and the road to failure are almost exactly the same.",a:"Colin R. Davis",k:"road success failure same path"},
+    {q:"Success is not final, failure is not fatal: it is the courage to continue that counts.",a:"Winston Churchill",k:"success failure courage continuing"},
+    {q:"It's not about the destination; it's about the journey.",a:"Ralph Waldo Emerson",k:"destination journey path walking"},
+    {q:"The longest journey begins with a single step.",a:"Chinese Proverb",k:"longest journey single step begin"},
+    {q:"Even if you're on the right track, you'll get run over if you just sit there.",a:"Will Rogers",k:"right track moving forward"},
+    {q:"To travel is to live.",a:"Hans Christian Andersen",k:"traveling living journey adventure"},
+    {q:"Not all those who wander are lost.",a:"J.R.R. Tolkien",k:"wanderer path wilderness found"},
+    {q:"The road not taken makes all the difference.",a:"Robert Frost",k:"road not taken fork difference"},
+    {q:"We shall not cease from exploration, and the end of all our exploring will be to arrive where we started.",a:"T.S. Eliot",k:"exploration returning started journey"},
+    {q:"Life is a journey, and if you fall in love with the journey, you will be in love with life.",a:"Peter Hagerty",k:"journey life love falling"},
+    {q:"Keep walking through the storm. Your rainbow is waiting on the other side.",a:"Heather Stillufsen",k:"walking storm rainbow waiting"},
+    {q:"Every path has its puddle.",a:"English Proverb",k:"path puddle difficulty way"},
+    {q:"The path is made by walking.",a:"Antonio Machado",k:"path made walking forward"},
+    {q:"The trail is the thing, not the end of the trail. Travel too fast and you miss all you are traveling for.",a:"Louis L'Amour",k:"trail not end too fast slow"},
+    {q:"I am not afraid of the path, only of the stopping.",a:"Unknown",k:"path not afraid of stopping"},
+    {q:"Good things come to those who work for it.",a:"Unknown",k:"working for good things reward"},
+    {q:"A journey of a thousand miles begins beneath one's feet.",a:"Lao Tzu",k:"thousand miles beneath feet"},
+    {q:"The secret of getting ahead is getting started.",a:"Mark Twain",k:"getting started ahead secret"},
+    {q:"Every expert was once a beginner.",a:"Helen Hayes",k:"expert beginner was once"},
+    {q:"Persistence is the twin sister of excellence.",a:"Marabel Morgan",k:"persistence excellence twin sisters"},
+    {q:"I have not failed. I've just found 10,000 ways that won't work.",a:"Thomas Edison",k:"failure finding ways Edison lab"},
+    {q:"Perseverance is not a long race; it is many short races one after another.",a:"Walter Elliot",k:"perseverance short races one after"},
+    {q:"Energy and persistence conquer all things.",a:"Benjamin Franklin",k:"energy persistence conquering all"},
+    {q:"The most reliable way to predict the future is to create it.",a:"Abraham Lincoln",k:"predicting future creating it"},
+    {q:"Opportunities don't happen. You create them.",a:"Chris Grosser",k:"opportunities created not happening"},
+    {q:"Success usually comes to those who are too busy to be looking for it.",a:"Henry David Thoreau",k:"busy success finding naturally"},
+    {q:"Courage is one step ahead of fear.",a:"Coleman Young",k:"courage step ahead fear"},
+    {q:"Little by little, one travels far.",a:"J.R.R. Tolkien",k:"little by little far traveling"},
+    {q:"When you feel like quitting, think about why you started.",a:"Unknown",k:"quitting thinking why started"},
+    {q:"Don't watch the clock; do what it does. Keep going.",a:"Sam Levenson",k:"clock keep going not watching"},
+    {q:"A river cuts through rock, not because of its power but because of its persistence.",a:"James N. Watkins",k:"river rock cutting persistence"},
+    {q:"Many of life's failures are people who did not realize how close they were to success when they gave up.",a:"Thomas Edison",k:"close success failure giving up"},
+    {q:"You don't have to be great to start, but you have to start to be great.",a:"Zig Ziglar",k:"starting great not great starting"},
+    {q:"Perseverance is the hard work you do after you get tired of doing the hard work you already did.",a:"Newt Gingrich",k:"perseverance tired hard work continuing"},
+    {q:"Success is stumbling from failure to failure with no loss of enthusiasm.",a:"Winston Churchill",k:"stumbling failure enthusiasm success"},
+    {q:"Keep on going, and the chances are that you will stumble on something, perhaps when you are least expecting it.",a:"Charles F. Kettering",k:"keep going stumble discovery unexpected"},
+    {q:"The difference between perseverance and obstinacy is that one comes from a strong will, and the other from a strong won't.",a:"Henry Ward Beecher",k:"perseverance obstinacy will won't"},
+    {q:"Through perseverance many people win success out of what seemed destined to be failure.",a:"Benjamin Disraeli",k:"perseverance winning success failure"},
+    // ── LOVE & CONNECTION ─────────────────────────────────────────────────
+    {q:"Love is composed of a single soul inhabiting two bodies.",a:"Aristotle",k:"two figures one soul embrace"},
+    {q:"The best and most beautiful things in the world cannot be seen or even touched — they must be felt with the heart.",a:"Helen Keller",k:"heart feeling beautiful unseen"},
+    {q:"Love is not about how many days, months, or years you have been together. Love is about how much you love each other every single day.",a:"Unknown",k:"love daily every single day"},
+    {q:"We loved with a love that was more than love.",a:"Edgar Allan Poe",k:"love more than love deep"},
+    {q:"The greatest thing you'll ever learn is just to love, and be loved in return.",a:"eden ahbez",k:"learning love returned greatest"},
+    {q:"Love yourself first, because that's who you'll be spending the rest of your life with.",a:"Unknown",k:"loving yourself first life"},
+    {q:"Love takes off the masks that we fear we cannot live without and know we cannot live within.",a:"James Baldwin",k:"love removing masks fear"},
+    {q:"A friend is a gift you give yourself.",a:"Robert Louis Stevenson",k:"friend gift yourself giving"},
+    {q:"The most important thing in the world is family and love.",a:"John Wooden",k:"family love most important"},
+    {q:"Where there is love there is life.",a:"Mahatma Gandhi",k:"love life together flowering"},
+    {q:"Love is not love which alters when it alteration finds.",a:"William Shakespeare",k:"love unaltered constant true"},
+    {q:"The more I think about it, the more I realize there is nothing more artistic than to love others.",a:"Vincent van Gogh",k:"loving others artistic creative"},
+    {q:"We are all born for love. It is the principle of existence, and its only end.",a:"Benjamin Disraeli",k:"born for love existence principle"},
+    {q:"Human love needs human meeting.",a:"Martin Buber",k:"human meeting connection touch"},
+    {q:"Love is the only force capable of transforming an enemy into a friend.",a:"Martin Luther King Jr.",k:"love transforming enemy friend"},
+    {q:"The beginning of love is to let those we love be perfectly themselves.",a:"Thomas Merton",k:"love letting be perfectly themselves"},
+    {q:"Love doesn't make the world go round. Love is what makes the ride worthwhile.",a:"Franklin P. Jones",k:"love worthwhile ride world"},
+    {q:"I have found that if you love life, life will love you back.",a:"Arthur Rubinstein",k:"loving life life loves back"},
+    {q:"Love all, trust a few, do wrong to none.",a:"William Shakespeare",k:"love all trust few wrong none"},
+    {q:"To love is to risk not being loved in return.",a:"Leo Buscaglia",k:"risk love returned not"},
+    {q:"The greatest happiness of life is the conviction that we are loved.",a:"Victor Hugo",k:"happiness conviction loved"},
+    {q:"In the arithmetic of love, one plus one equals everything.",a:"Mignon McLaughlin",k:"arithmetic love everything equals"},
+    {q:"There is no remedy for love but to love more.",a:"Henry David Thoreau",k:"remedy love more loving"},
+    {q:"The giving of love is an education in itself.",a:"Eleanor Roosevelt",k:"giving love education itself"},
+    {q:"Love is friendship on fire.",a:"Jeremy Taylor",k:"friendship fire love burning"},
+    {q:"Being deeply loved by someone gives you strength.",a:"Lao Tzu",k:"deeply loved strength given"},
+    {q:"We are all a little broken. But last time I checked, broken crayons still color.",a:"Unknown",k:"broken crayons coloring still"},
+    {q:"You don't love someone for their looks, or their clothes, or their fancy car, but because they sing a song only you can hear.",a:"Oscar Wilde",k:"song love only you hear"},
+    {q:"Love does not consist in gazing at each other, but in looking outward together in the same direction.",a:"Antoine de Saint-Exupéry",k:"looking outward together same direction"},
+    {q:"The best proof of love is trust.",a:"Joyce Brothers",k:"proof love trust best"},
+    {q:"To love and be loved is to feel the sun from both sides.",a:"David Viscott",k:"sun both sides love felt"},
+    {q:"What the world needs now is love, sweet love.",a:"Burt Bacharach",k:"world needs love sweet"},
+    {q:"If you have only one smile in you, give it to the people you love.",a:"Maya Angelou",k:"smile giving people loved"},
+    {q:"The most wasted of all days is one without laughter.",a:"e.e. cummings",k:"laughter day wasted without"},
+    {q:"You are my sun, my moon, and all my stars.",a:"e.e. cummings",k:"sun moon stars you"},
+    {q:"At the end of the day, it's not about what you have or even what you've accomplished — it's about who you've lifted up.",a:"Unknown",k:"lifting up others end of day"},
+    {q:"I love you not only for what you are, but for what I am when I am with you.",a:"Roy Croft",k:"love who I am with you"},
+    {q:"Happiness is only real when shared.",a:"Jon Krakauer",k:"happiness shared real only"},
+    {q:"The heart that loves is always young.",a:"Greek Proverb",k:"loving heart always young"},
+    {q:"Love is the bridge between two hearts.",a:"Unknown",k:"bridge between hearts love"},
+    // ── SOLITUDE & REFLECTION ─────────────────────────────────────────────
+    {q:"In solitude the mind gains strength and learns to lean upon itself.",a:"Laurence Sterne",k:"solitude mind strength leaning"},
+    {q:"Knowing yourself is the beginning of all wisdom.",a:"Aristotle",k:"knowing self wisdom beginning"},
+    {q:"The quieter you become, the more you are able to hear.",a:"Rumi",k:"quiet hearing more silence"},
+    {q:"Loneliness is the poverty of self; solitude is the richness of self.",a:"May Sarton",k:"loneliness poverty solitude richness"},
+    {q:"I restore myself when I'm alone.",a:"Marilyn Monroe",k:"alone restoring oneself solitude"},
+    {q:"Silence is a source of great strength.",a:"Lao Tzu",k:"silence source great strength"},
+    {q:"Be alone, that is the secret of invention; be alone, that is when ideas are born.",a:"Nikola Tesla",k:"alone invention ideas born"},
+    {q:"You cannot be lonely if you like the person you're alone with.",a:"Wayne Dyer",k:"cannot lonely liking oneself"},
+    {q:"Who looks outside, dreams; who looks inside, awakes.",a:"Carl Jung",k:"looking inside awakes dreaming"},
+    {q:"The best thinking has been done in solitude.",a:"Thomas Edison",k:"best thinking solitude quiet"},
+    {q:"In order to understand the world, one has to turn away from it on occasion.",a:"Albert Camus",k:"turning away world understanding"},
+    {q:"I never found the companion that was so companionable as solitude.",a:"Henry David Thoreau",k:"companionable solitude Thoreau pond"},
+    {q:"Conversation enriches the understanding, but solitude is the school of genius.",a:"Edward Gibbon",k:"solitude school genius understanding"},
+    {q:"I am enough of an artist to draw freely upon my imagination.",a:"Albert Einstein",k:"artist imagination freely drawing"},
+    {q:"In quiet places, reason abounds.",a:"Adlai Stevenson",k:"quiet places reason abounds"},
+    {q:"The soul always knows what to do to heal itself. The challenge is to silence the mind.",a:"Caroline Myss",k:"soul healing silence mind"},
+    {q:"You need to learn how to select your thoughts just the same way you select your clothes every day.",a:"Elizabeth Gilbert",k:"selecting thoughts clothes daily"},
+    {q:"Inner peace begins the moment you choose not to allow another person or event to control your emotions.",a:"Pema Chödrön",k:"inner peace control emotions choosing"},
+    {q:"Half of our mistakes in life arise from feeling where we ought to think.",a:"John Christian Bovee",k:"mistakes feeling thinking half"},
+    {q:"Solitude is where one discovers one is not alone.",a:"Marty Rubin",k:"solitude discovering not alone"},
+    {q:"The more powerful and original a mind, the more it will incline towards the religion of solitude.",a:"Aldous Huxley",k:"powerful original mind solitude"},
+    {q:"If you are lonely when you're alone, you are in bad company.",a:"Jean-Paul Sartre",k:"lonely alone bad company"},
+    {q:"Almost everything will work again if you unplug it for a few minutes, including you.",a:"Anne Lamott",k:"unplugging resting quiet break"},
+    {q:"The more you know yourself, the more clarity there is.",a:"Jiddu Krishnamurti",k:"knowing yourself clarity more"},
+    {q:"Reflection is the lamp of the heart.",a:"Ibn Ata Allah",k:"reflection lamp heart inner"},
+    {q:"Be still, and know.",a:"Psalms 46:10",k:"stillness knowing being quiet"},
+    {q:"The answers you seek never come when the mind is busy.",a:"Unknown",k:"answers seeking quiet mind"},
+    {q:"The examined life is not worth living.",a:"Socrates",k:"examined life worth living not"},
+    {q:"In the midst of movement and chaos, keep stillness inside of you.",a:"Deepak Chopra",k:"stillness inside movement chaos"},
+    {q:"Your vision will become clear only when you look into your heart.",a:"Carl Jung",k:"vision clear heart looking"},
+    {q:"One who knows oneself has no reason to fear.",a:"Unknown",k:"knowing oneself no fear"},
+    {q:"We need silence to be able to touch souls.",a:"Mother Teresa",k:"silence touching souls need"},
+    {q:"What you are speaks so loudly I cannot hear what you say.",a:"Ralph Waldo Emerson",k:"being speaking loud actions"},
+    {q:"The quieter you become, the more you can hear.",a:"Ram Dass",k:"quiet becoming hearing more"},
+    {q:"Meditation is not a way of making your mind quiet. It's a way of entering the quiet that's already there.",a:"Deepak Chopra",k:"meditation entering quiet already"},
+    {q:"Sometimes you just need to talk to a three year old and an eighty year old to get the truth.",a:"Unknown",k:"truth simplicity childlike elderly"},
+    {q:"Truth is not something outside to be discovered, it is something inside to be realized.",a:"Osho",k:"truth inside realized not outside"},
+    {q:"I am not what happened to me. I am what I choose to become.",a:"Carl Jung",k:"choosing becoming not what happened"},
+    {q:"The highest form of human intelligence is to observe yourself without judgment.",a:"Jiddu Krishnamurti",k:"observing yourself without judgment"},
+    {q:"Reflection can begin by doing what you always do, just slower.",a:"Unknown",k:"reflection slower doing"},
+    // ── WISDOM & PHILOSOPHY ───────────────────────────────────────────────
+    {q:"The only true wisdom is in knowing you know nothing.",a:"Socrates",k:"knowing nothing wisdom true"},
+    {q:"Yesterday is history, tomorrow is a mystery, today is a gift of God, which is why we call it the present.",a:"Bill Keane",k:"present gift today mystery"},
+    {q:"The unexamined life is not worth living.",a:"Socrates",k:"examined life philosopher thinking"},
+    {q:"We are what we repeatedly do. Excellence, then, is not an act, but a habit.",a:"Aristotle",k:"habits excellence repeatedly doing"},
+    {q:"Know thyself.",a:"Socrates",k:"knowing thyself wisdom temple"},
+    {q:"To thine own self be true.",a:"William Shakespeare",k:"true self own being"},
+    {q:"The measure of a man is what he does with power.",a:"Plato",k:"measure power man doing"},
+    {q:"All things in moderation, including moderation.",a:"Oscar Wilde",k:"moderation balance wisdom"},
+    {q:"The beginning of wisdom is the definition of terms.",a:"Socrates",k:"definition terms beginning wisdom"},
+    {q:"As far as possible, without surrender, be on good terms with all persons.",a:"Max Ehrmann",k:"good terms all persons possible"},
+    {q:"The simplest acts of kindness are by far more powerful than a thousand heads bowing in prayer.",a:"Mahatma Gandhi",k:"kindness acts powerful simple"},
+    {q:"No man ever steps in the same river twice, for it's not the same river and he's not the same man.",a:"Heraclitus",k:"river same twice never same"},
+    {q:"I think, therefore I am.",a:"René Descartes",k:"thinking being existence philosopher"},
+    {q:"Reason is the substance of the universe.",a:"G.W.F. Hegel",k:"reason substance universe philosophy"},
+    {q:"One cannot not communicate.",a:"Paul Watzlawick",k:"communicating cannot not always"},
+    {q:"All that we are is the result of what we have thought.",a:"Buddha",k:"thought result being what"},
+    {q:"The foolish man seeks happiness in the distance; the wise grows it under his feet.",a:"James Oppenheim",k:"wise growing happiness underfoot"},
+    {q:"Education is not filling a bucket, but lighting a fire.",a:"W.B. Yeats",k:"lighting fire education not filling"},
+    {q:"Whoever fights monsters should see to it that in the process he does not become a monster.",a:"Friedrich Nietzsche",k:"fighting monsters becoming one"},
+    {q:"Not all readers are leaders, but all leaders are readers.",a:"Harry S. Truman",k:"readers leaders all reading"},
+    {q:"The doors of wisdom are never shut.",a:"Benjamin Franklin",k:"doors wisdom never shut open"},
+    {q:"Wisdom is not a product of schooling but of the lifelong attempt to acquire it.",a:"Albert Einstein",k:"wisdom lifelong acquiring not schooling"},
+    {q:"To acquire knowledge, one must study; but to acquire wisdom, one must observe.",a:"Marilyn vos Savant",k:"study knowledge observe wisdom"},
+    {q:"Memory is the mother of all wisdom.",a:"Aeschylus",k:"memory mother wisdom"},
+    {q:"The more I read, the more I acquire, the more certain I am that I know nothing.",a:"Voltaire",k:"reading acquiring knowing nothing"},
+    {q:"I am a part of all that I have met.",a:"Alfred Lord Tennyson",k:"part all I have met"},
+    {q:"The truth is rarely pure and never simple.",a:"Oscar Wilde",k:"truth rarely pure never simple"},
+    {q:"It is not enough to have a good mind; the main thing is to use it well.",a:"René Descartes",k:"good mind using it well"},
+    {q:"The greatest enemy of knowledge is not ignorance, it is the illusion of knowledge.",a:"Stephen Hawking",k:"illusion knowledge greatest enemy"},
+    {q:"Curiosity is more important than knowledge.",a:"Albert Einstein",k:"curiosity knowledge more important"},
+    {q:"In wisdom gathered over time I have found that every experience is a form of exploration.",a:"Ansel Adams",k:"exploration experience wisdom time"},
+    {q:"Knowledge speaks, but wisdom listens.",a:"Jimi Hendrix",k:"knowledge speaks wisdom listens"},
+    {q:"Real wisdom is not the knowledge of everything, but the knowledge of which things in life are necessary.",a:"Leo Tolstoy",k:"necessary things wisdom life"},
+    {q:"Be careful about reading health books. You may die of a misprint.",a:"Mark Twain",k:"careful reading books misprint"},
+    {q:"Wisdom is the reward you get for a lifetime of listening when you'd have preferred to talk.",a:"Doug Larson",k:"wisdom listening reward lifetime"},
+    {q:"One of the greatest victories you can gain over someone is to beat him at politeness.",a:"Josh Billings",k:"politeness victory over someone"},
+    {q:"The two most important days in your life are the day you are born and the day you find out why.",a:"Mark Twain",k:"two days born why purpose"},
+    {q:"Science is organized knowledge. Wisdom is organized life.",a:"Immanuel Kant",k:"organized knowledge science life"},
+    {q:"Learning never exhausts the mind.",a:"Leonardo da Vinci",k:"learning never exhausts mind"},
+    {q:"I am always doing that which I cannot do, in order that I may learn how to do it.",a:"Pablo Picasso",k:"doing cannot do learning how"},
+    // ── GRIEF & HEALING ───────────────────────────────────────────────────
+    {q:"Grief is just love with no place to go.",a:"Jamie Anderson",k:"grief love no place"},
+    {q:"Give sorrow words. The grief that does not speak whispers the o'er-fraught heart and bids it break.",a:"William Shakespeare",k:"sorrow words grief speak"},
+    {q:"The most beautiful people we have known are those who have known defeat, known suffering, known struggle, known loss.",a:"Elisabeth Kübler-Ross",k:"beautiful people defeat suffering known"},
+    {q:"You have to cry a little and laugh a little, and hope that you can find a balance between the two.",a:"Unknown",k:"crying laughing balance between two"},
+    {q:"In times of grief and sorrow I will hold you and rock you and take your grief and make it my own.",a:"Unknown",k:"grief holding rocking comfort"},
+    {q:"Tears are words that need to be written.",a:"Paulo Coelho",k:"tears words written needed"},
+    {q:"When you are sorrowful look again in your heart, and you shall see that in truth you are weeping for that which has been your delight.",a:"Kahlil Gibran",k:"sorrow delight weeping heart"},
+    {q:"We must embrace pain and burn it as fuel for our journey.",a:"Kenji Miyazawa",k:"embrace pain fuel journey burning"},
+    {q:"Deep grief sometimes is almost like a specific location, a coordinate on a map of time.",a:"Elizabeth Gilbert",k:"grief location coordinate map time"},
+    {q:"Tears are the silent language of grief.",a:"Voltaire",k:"tears silent language grief"},
+    {q:"Do not go gentle into that good night.",a:"Dylan Thomas",k:"raging against dying light night"},
+    {q:"There are wounds that never show on the body that are deeper and more hurtful than anything that bleeds.",a:"Laurell K. Hamilton",k:"invisible wounds deeper hurtful"},
+    {q:"The pain passes, but the beauty remains.",a:"Pierre-Auguste Renoir",k:"pain passes beauty remains"},
+    {q:"What we have once enjoyed we can never lose. All that we love deeply becomes a part of us.",a:"Helen Keller",k:"enjoyed lost love deeply part"},
+    {q:"Grief is the price we pay for love.",a:"Queen Elizabeth II",k:"grief price love paid"},
+    {q:"How lucky I am to have something that makes saying goodbye so hard.",a:"A.A. Milne",k:"lucky goodbye so hard love"},
+    {q:"Only people who are capable of loving strongly can also suffer great sorrow.",a:"Leo Tolstoy",k:"loving strongly suffer great sorrow"},
+    {q:"To weep is to make less the depth of grief.",a:"William Shakespeare",k:"weeping less depth grief"},
+    {q:"Grief is a tidal wave that overtakes you.",a:"Stephanie Ericsson",k:"tidal wave grief overtaking"},
+    {q:"Loss is nothing else but change, and change is Nature's delight.",a:"Marcus Aurelius",k:"loss change nature delight"},
+    {q:"Sorrow is how we learn to love. Your heart's not breaking. It hurts because it's getting larger.",a:"Unknown",k:"sorrow heart larger learning love"},
+    {q:"There is a sacredness in tears.",a:"Washington Irving",k:"sacred tears sacredness crying"},
+    {q:"You cannot heal what you do not feel.",a:"Unknown",k:"healing feeling acknowledging pain"},
+    {q:"Give yourself permission to grieve.",a:"Unknown",k:"permission grief allowing feeling"},
+    {q:"Time heals all wounds, but sometimes it needs help.",a:"Unknown",k:"time healing wounds helping"},
+    {q:"When grief is deepest, words are fewest.",a:"Ann Voskamp",k:"grief deepest words fewest"},
+    {q:"After great pain, a formal feeling comes.",a:"Emily Dickinson",k:"great pain formal feeling after"},
+    {q:"Life is not the way it's supposed to be. It's the way it is.",a:"Virginia Satir",k:"life way it is supposed"},
+    {q:"When someone you love becomes a memory, that memory becomes a treasure.",a:"Unknown",k:"loved memory treasure"},
+    {q:"Don't grieve. Anything you lose comes round in another form.",a:"Rumi",k:"grieve loss another form round"},
+    {q:"Grief can be the garden of compassion.",a:"Rumi",k:"grief garden compassion"},
+    {q:"It's so curious: one can resist tears and 'behave' very well in the hardest hours of grief.",a:"Colette",k:"resist tears behave grief"},
+    {q:"There is no grief like the grief that does not speak.",a:"Henry Wadsworth Longfellow",k:"grief that does not speak"},
+    {q:"When you feel like you're drowning in grief, know that it is the weight of love.",a:"Unknown",k:"drowning grief weight love"},
+    {q:"Absence is a house so vast that inside you will pass through its walls and hang pictures on the air.",a:"Pablo Neruda",k:"absence vast house walls air"},
+    {q:"In grief nothing 'stays put.' One keeps on emerging from a phase, but it always recurs.",a:"C.S. Lewis",k:"grief recurring phase emerging"},
+    {q:"Healing is not linear.",a:"Unknown",k:"healing not linear curved"},
+    {q:"What is grief, if not love persevering?",a:"WandaVision",k:"grief love persevering"},
+    {q:"Blessed are they that mourn: for they shall be comforted.",a:"Matthew 5:4",k:"mourn comforted blessed"},
+    {q:"The art of losing isn't hard to master.",a:"Elizabeth Bishop",k:"art losing master hard not"},
+    // ── PERSEVERANCE & ENDURANCE ──────────────────────────────────────────
+    {q:"Press on. Nothing in the world can take the place of persistence.",a:"Calvin Coolidge",k:"pressing on persistence world"},
+    {q:"The most essential factor is persistence—the determination never to allow your energy or enthusiasm to be dampened by the discouragement that must inevitably come.",a:"James Whitcomb Riley",k:"persistence determination enthusiasm"},
+    {q:"Rivers know this: there is no hurry. We shall get there some day.",a:"A.A. Milne",k:"river no hurry someday getting"},
+    {q:"Never, never, never give up.",a:"Winston Churchill",k:"never giving up resolve iron"},
+    {q:"The most common form of despair is not being who you are.",a:"Søren Kierkegaard",k:"despair not being yourself"},
+    {q:"Most people give up just when they're about to achieve success.",a:"Ross Perot",k:"giving up just before success"},
+    {q:"The pain of discipline is far less than the pain of regret.",a:"Sarah Bombell",k:"discipline regret pain less"},
+    {q:"Character consists of what you do on the third and fourth tries.",a:"James Michener",k:"character third fourth tries"},
+    {q:"It always seems impossible until it is done.",a:"Nelson Mandela",k:"impossible until done always"},
+    {q:"Endurance is not just the ability to bear a hard thing, but to turn it into glory.",a:"William Barclay",k:"endurance bearing turning glory"},
+    {q:"Through perseverance many people win success out of what seemed destined to be failure.",a:"Benjamin Disraeli",k:"winning success through perseverance"},
+    {q:"If you're going through hell, keep going.",a:"Winston Churchill",k:"going through hell keep going"},
+    {q:"The trick is to enjoy life. Don't wish away your days, waiting for better ones ahead.",a:"Marjorie Pay Hinckley",k:"enjoy life days waiting not"},
+    {q:"It matters not how a man dies, but how he lives.",a:"Samuel Johnson",k:"how lives matters dying"},
+    {q:"Keep your face to the sunshine and you cannot see a shadow.",a:"Helen Keller",k:"sunshine shadow cannot see"},
+    {q:"Ambition is the path to success. Persistence is the vehicle you arrive in.",a:"Bill Bradley",k:"ambition path success vehicle"},
+    {q:"In the confrontation between the stream and the rock, the stream always wins.",a:"H. Jackson Brown Jr.",k:"stream rock always wins"},
+    {q:"The secret of endurance is to remember that your pain is temporary but your pride in having prevailed will last forever.",a:"Unknown",k:"pain temporary pride endurance lasting"},
+    {q:"Heroism is endurance for one moment more.",a:"George F. Kennan",k:"heroism endurance one moment more"},
+    {q:"Great works are performed not by strength but by perseverance.",a:"Samuel Johnson",k:"great works perseverance not strength"},
+    {q:"Nothing in the world can take the place of persistence. Talent will not; nothing is more common than unsuccessful men with talent.",a:"Calvin Coolidge",k:"persistence talent common unsuccessful"},
+    {q:"I do not pray for a lighter load, but for a stronger back.",a:"Phillips Brooks",k:"stronger back not lighter load"},
+    {q:"To persevere, trusting in what hopes he has, is courage in a man.",a:"Euripides",k:"persevere trusting hoping courage"},
+    {q:"Let me tell you the secret that has led to my goal. My strength lies solely in my tenacity.",a:"Louis Pasteur",k:"tenacity secret goal strength"},
+    {q:"Endurance is not just the ability to bear a hard thing.",a:"William Barclay",k:"endurance bearing hard thing"},
+    {q:"There is no failure except in no longer trying.",a:"Elbert Hubbard",k:"failure not trying no longer"},
+    {q:"It's not that I'm so smart, it's just that I stay with problems longer.",a:"Albert Einstein",k:"staying with problems longer smart"},
+    {q:"Life doesn't get easier or more forgiving; we get stronger and more resilient.",a:"Steve Maraboli",k:"stronger resilient life harder"},
+    {q:"One who conquers the sea today is ready to conquer the ocean tomorrow.",a:"Matshona Dhliwayo",k:"conquering sea ocean tomorrow"},
+    {q:"Persistence and resilience only come from having been given the chance to work through difficult problems.",a:"Gever Tulley",k:"difficult problems chance resilience"},
+    {q:"When we are no longer able to change a situation, we are challenged to change ourselves.",a:"Viktor Frankl",k:"change situation changing ourselves"},
+    {q:"My will shall shape the future.",a:"Ella Wheeler Wilcox",k:"will shaping future resolve"},
+    {q:"Look for the silver lining.",a:"Jerome Kern",k:"silver lining looking bright"},
+    {q:"Where the willingness is great, the difficulties cannot be great.",a:"Niccolò Machiavelli",k:"willingness difficulties great small"},
+    {q:"Even the greatest was once a beginner.",a:"Unknown",k:"greatest beginner once starting"},
+    {q:"Courage is grace under pressure.",a:"Ernest Hemingway",k:"grace pressure courage Hemingway"},
+    {q:"An invincible determination can accomplish almost anything.",a:"Thomas Fuller",k:"invincible determination accomplishing"},
+    {q:"The truth is that our finest moments are most likely to occur when we are feeling deeply uncomfortable.",a:"M. Scott Peck",k:"finest moments uncomfortable deeply"},
+    {q:"Be like a postage stamp — stick to one thing until you get there.",a:"Josh Billings",k:"postage stamp stick one thing"},
+    {q:"Champions aren't made in gyms. Champions are made from something they have deep inside them.",a:"Muhammad Ali",k:"champion deep inside strength"},
+    // ── FREEDOM & ASPIRATION ──────────────────────────────────────────────
+    {q:"Freedom is not worth having if it does not include the freedom to make mistakes.",a:"Mahatma Gandhi",k:"freedom mistakes worth having"},
+    {q:"To fly is everything.",a:"Otto Lilienthal",k:"flying everything bird sky"},
+    {q:"Those who deny freedom to others deserve it not for themselves.",a:"Abraham Lincoln",k:"freedom denied deserving not"},
+    {q:"The most courageous act is still to think for yourself. Aloud.",a:"Coco Chanel",k:"thinking yourself aloud courageous"},
+    {q:"Free at last. Thank God Almighty, we are free at last.",a:"Martin Luther King Jr.",k:"free last liberation joy"},
+    {q:"A bird that you set free may be caught again, but a word that escapes your lips will not return.",a:"Jewish Proverb",k:"bird free word escaped lips"},
+    {q:"Freedom is what you do with what's been done to you.",a:"Jean-Paul Sartre",k:"freedom choosing done to you"},
+    {q:"You wanna fly, you got to give up the shit that weighs you down.",a:"Toni Morrison",k:"flying letting go weight down"},
+    {q:"Two roads diverged in a wood, and I — I took the one less traveled by.",a:"Robert Frost",k:"two roads diverged less traveled"},
+    {q:"No one can make you feel inferior without your consent.",a:"Eleanor Roosevelt",k:"inferior consent no one makes"},
+    {q:"I am no bird; and no net ensnares me.",a:"Charlotte Brontë",k:"no bird net ensnares free"},
+    {q:"The only way to deal with an unfree world is to become so absolutely free that your very existence is an act of rebellion.",a:"Albert Camus",k:"absolutely free rebellion existence"},
+    {q:"Live free or die.",a:"John Stark",k:"live free die motto"},
+    {q:"Float like a butterfly, sting like a bee.",a:"Muhammad Ali",k:"butterfly floating bee stinging"},
+    {q:"Don't be afraid to give up the good to go for the great.",a:"John D. Rockefeller",k:"giving up good great aspiring"},
+    {q:"Man is free at the instant he wants to be.",a:"Voltaire",k:"free instant wanting freedom"},
+    {q:"The secret of happiness is freedom, the secret of freedom is courage.",a:"Carrie Jones",k:"happiness freedom courage secret"},
+    {q:"I am large, I contain multitudes.",a:"Walt Whitman",k:"large containing multitudes self"},
+    {q:"When I dare to be powerful, to use my strength in the service of my vision, then it becomes less and less important whether I am afraid.",a:"Audre Lorde",k:"daring powerful strength vision fear"},
+    {q:"If you want to fly, give up everything that weighs you down.",a:"Buddha",k:"flying giving up weight down"},
+    {q:"Your wings already exist. All you have to do is fly.",a:"Unknown",k:"wings existing flying already"},
+    {q:"Spread your wings and fly.",a:"Unknown",k:"wings spreading flying free"},
+    {q:"To be nobody but yourself — in a world which is doing its best, night and day, to make you everybody else — means to fight the hardest battle.",a:"e.e. cummings",k:"nobody but yourself fight hardest"},
+    {q:"The most important kind of freedom is to be what you really are.",a:"Jim Morrison",k:"freedom being what you really are"},
+    {q:"All things are possible if you believe.",a:"Unknown",k:"all things possible believing"},
+    {q:"Freedom lies in being bold.",a:"Robert Frost",k:"freedom bold being"},
+    {q:"The eagle was killed by an arrow made from its own feathers.",a:"Unknown",k:"eagle arrow feathers killed"},
+    {q:"In the long run, men hit only what they aim at.",a:"Henry David Thoreau",k:"aiming hitting target long run"},
+    {q:"Set your course by the stars, not by the lights of every passing ship.",a:"Omar Nelson Bradley",k:"stars course passing ships"},
+    {q:"Don't limit your challenges. Challenge your limits.",a:"Unknown",k:"challenging limits not limiting"},
+    {q:"A ship in harbor is safe, but that is not what ships are for.",a:"John A. Shedd",k:"ship harbor safe not for"},
+    {q:"You have two options: evolve or remain.",a:"Unknown",k:"evolve remain two options"},
+    {q:"I cannot be still when my soul demands motion.",a:"Unknown",k:"motion soul demands moving"},
+    {q:"Give me liberty, or give me death.",a:"Patrick Henry",k:"liberty death freedom revolution"},
+    {q:"Dream no small dreams for they have no power to move the hearts of men.",a:"Goethe",k:"dream large hearts moving power"},
+    {q:"He who would learn to fly one day must first learn to stand and walk and run.",a:"Friedrich Nietzsche",k:"learning fly walk run first"},
+    {q:"The sky has never been the limit.",a:"Unknown",k:"sky limit beyond aspiring"},
+    {q:"Aspire to inspire before you expire.",a:"Unknown",k:"aspire inspire before expire"},
+    {q:"Every moment spent living is better than any spent watching the time pass.",a:"Unknown",k:"living not watching time"},
+    {q:"We fly to the heights of our imagination.",a:"Unknown",k:"imagination flying heights"},
+    // ── KINDNESS & COMPASSION ─────────────────────────────────────────────
+    {q:"No act of kindness, no matter how small, is ever wasted.",a:"Aesop",k:"kindness small act never wasted"},
+    {q:"Be kind, for everyone you meet is fighting a battle you know nothing about.",a:"Ian Maclaren",k:"kindness everyone fighting battle"},
+    {q:"In a world where you can be anything, be kind.",a:"Unknown",k:"being kind world choosing"},
+    {q:"You cannot do a kindness too soon, for you never know how soon it will be too late.",a:"Ralph Waldo Emerson",k:"kindness too soon never late"},
+    {q:"The best way to find yourself is to lose yourself in the service of others.",a:"Mahatma Gandhi",k:"losing yourself service others"},
+    {q:"We make a living by what we get, but we make a life by what we give.",a:"Winston Churchill",k:"giving making life living"},
+    {q:"Carry out a random act of kindness, with no expectation of reward.",a:"Princess Diana",k:"random kindness no expectation reward"},
+    {q:"Compassion is the basis of morality.",a:"Arthur Schopenhauer",k:"compassion basis morality"},
+    {q:"Kind words can be short and easy to speak, but their echoes are truly endless.",a:"Mother Teresa",k:"kind words short echoes endless"},
+    {q:"Love and kindness are never wasted. They always make a difference.",a:"Barbara de Angelis",k:"love kindness never wasted difference"},
+    {q:"The simple act of caring is heroic.",a:"Edward Albert",k:"caring act heroic simple"},
+    {q:"You have not lived today until you have done something for someone who can never repay you.",a:"John Bunyan",k:"done something repay never today"},
+    {q:"If you want others to be happy, practice compassion. If you want to be happy, practice compassion.",a:"Dalai Lama",k:"compassion practice others happy"},
+    {q:"A warm smile is the universal language of kindness.",a:"William Arthur Ward",k:"warm smile universal kindness"},
+    {q:"One kind word can warm three winter months.",a:"Japanese Proverb",k:"kind word warm winter months"},
+    {q:"When words are both true and kind, they can change our world.",a:"Buddha",k:"true kind words change world"},
+    {q:"It's nice to be important, but it's more important to be nice.",a:"John Templeton",k:"nice important more being"},
+    {q:"Kindness is a language which the deaf can hear and the blind can see.",a:"Mark Twain",k:"kindness language deaf blind"},
+    {q:"Do good and good will come to you.",a:"Adam Lowy",k:"good deed return coming"},
+    {q:"The whole point of being alive is to evolve into the complete person you were intended to be.",a:"Oprah Winfrey",k:"evolving intended complete person"},
+    {q:"Treat everyone with politeness and kindness, not because they are nice, but because you are.",a:"Roy T. Bennett",k:"politeness kindness because you are"},
+    {q:"A good deed is never lost.",a:"Saint Basil",k:"good deed never lost"},
+    {q:"Do all the good you can, for all the people you can, in all the ways you can.",a:"John Wesley",k:"good people ways all"},
+    {q:"Small acts of kindness will be remembered long after large gestures are forgotten.",a:"Unknown",k:"small kindness remembered large forgotten"},
+    {q:"To give is to receive.",a:"A Course in Miracles",k:"giving receiving equal"},
+    {q:"The purpose of human life is to serve, and to show compassion and the will to help others.",a:"Albert Schweitzer",k:"serve compassion help others purpose"},
+    {q:"Real generosity toward the future lies in giving all to the present.",a:"Albert Camus",k:"generosity present giving all"},
+    {q:"Do things for people not because of who they are or what they do in return, but because of who you are.",a:"Harold S. Kushner",k:"doing for others who you are"},
+    {q:"Difficult roads often lead to beautiful destinations.",a:"Unknown",k:"difficult road beautiful destination"},
+    {q:"What I know for sure is that you feel real joy in direct proportion to how connected you are to living your truth.",a:"Oprah Winfrey",k:"joy truth connected living"},
+    {q:"Love yourself enough to set boundaries.",a:"Anna Taylor",k:"loving self boundaries setting"},
+    {q:"We are here to add what we can to life, not to get what we can from it.",a:"William Osler",k:"adding life not getting"},
+    {q:"Go and love someone exactly as they are and then watch how quickly they transform.",a:"Wes Angelozzi",k:"loving exactly as they are transform"},
+    {q:"The fragrance always remains in the hand that gives the rose.",a:"Heda Bejar",k:"rose giving fragrance remains hand"},
+    {q:"Kindness in words creates confidence. Kindness in thinking creates profoundness.",a:"Lao Tzu",k:"kindness words thinking creates"},
+    {q:"Teach this triple truth: a generous heart, kind speech, and a life of service.",a:"Buddha",k:"generous heart kind speech service"},
+    {q:"It is not what you do for your children, but what you have taught them to do for themselves.",a:"Ann Landers",k:"taught children do themselves"},
+    {q:"Let's radiate love into the world.",a:"Unknown",k:"radiating love world"},
+    {q:"A candle loses nothing by lighting another candle.",a:"James Keller",k:"candle lighting another loses nothing"},
+    {q:"Together we can change the world, just one random act of kindness at a time.",a:"Ron Hall",k:"together random kindness world"},
+    // ── MOUNTAINS & HEIGHTS ───────────────────────────────────────────────
+    {q:"The higher you climb, the better the view.",a:"Unknown",k:"climbing higher better view alpine"},
+    {q:"It is not the mountain we conquer but ourselves.",a:"Edmund Hillary",k:"mountain conquer ourselves summit"},
+    {q:"Mountains are not fair or unfair, they are just dangerous.",a:"Reinhold Messner",k:"mountains dangerous not fair"},
+    {q:"The mountains are a demanding school.",a:"Unknown",k:"mountains demanding school learning"},
+    {q:"You never climb the same mountain twice, not even in memory.",a:"Lito Tejada-Flores",k:"same mountain twice memory"},
+    {q:"Mountains have a way of dealing with overconfidence.",a:"Hermann Buhl",k:"mountain overconfidence dealing with"},
+    {q:"Somewhere between the bottom of the climb and the summit is the answer to the mystery.",a:"Barry Finlay",k:"climb bottom summit mystery answer"},
+    {q:"Climb the mountain so you can see the world, not so the world can see you.",a:"David McCullough Jr.",k:"climb see world not seen"},
+    {q:"The summit is what drives us, but the climb itself is what matters.",a:"Conrad Anker",k:"summit drives climb matters"},
+    {q:"Great things are done when men and mountains meet.",a:"William Blake",k:"great things men mountains meet"},
+    {q:"Mountains teach that not everything in this world can be rationally explained.",a:"Aleksander Lwow",k:"mountains teach not rational explained"},
+    {q:"I took a walk in the woods and came out taller than the trees.",a:"Henry David Thoreau",k:"walk woods taller than trees"},
+    {q:"Thousands of tired, nerve-shaken, over-civilized people are beginning to find out that going to the mountains is going home.",a:"John Muir",k:"going mountains going home"},
+    {q:"The Alps are a school of many things.",a:"Unknown",k:"Alps school many things learning"},
+    {q:"To rest in the shadow of a mountain is to feel the weight of eternity.",a:"Unknown",k:"shadow mountain eternity weight"},
+    {q:"In the mountains, there you feel free.",a:"T.S. Eliot",k:"mountains free feeling"},
+    {q:"The way up and the way down are one and the same.",a:"Heraclitus",k:"way up down same one"},
+    {q:"No man ever climbed to the top of a great mountain without help.",a:"Unknown",k:"climbed top mountain help"},
+    {q:"The mountain is calling and I must go.",a:"John Muir",k:"mountain calling must go"},
+    {q:"It's not the mountain that wears you out — it's the pebble in your shoe.",a:"Muhammad Ali",k:"mountain pebble shoe wearing"},
+    {q:"Every mountain top is within reach if you just keep climbing.",a:"Barry Finlay",k:"mountain top reach keep climbing"},
+    {q:"The crack of the mountain's heart is heard only at midnight.",a:"Unknown",k:"mountain heart midnight crack"},
+    {q:"How glorious a greeting the sun gives the mountains!",a:"John Muir",k:"sun greeting mountains glorious"},
+    {q:"If the path be beautiful, let us not ask where it leads.",a:"Anatole France",k:"beautiful path not asking where"},
+    {q:"The best view comes after the hardest climb.",a:"Unknown",k:"best view hardest climb after"},
+    {q:"The mountain remains unmoved at its seeming defeat by the mist.",a:"Rabindranath Tagore",k:"mountain unmoved mist defeat"},
+    {q:"Men go back to the mountains, as they go back to sailing ships at sea.",a:"Henry David Thoreau",k:"back mountains sailing sea"},
+    {q:"You are not in the mountains. The mountains are in you.",a:"John Muir",k:"mountains in you not in them"},
+    {q:"It's a great art to saunter.",a:"Henry David Thoreau",k:"sauntering great art walking"},
+    {q:"What I see from here is a forest, not the way the sky should be seen.",a:"Unknown",k:"forest sky seen differently"},
+    {q:"The summit is only the beginning.",a:"Unknown",k:"summit only beginning"},
+    {q:"Mountains are the beginning and the end of all natural scenery.",a:"John Ruskin",k:"mountains beginning end scenery"},
+    {q:"A mountain is composed of tiny grains of earth.",a:"Hsieh Lingyun",k:"mountain tiny grains earth composed"},
+    {q:"Keep close to Nature's heart.",a:"John Muir",k:"close nature heart staying"},
+    {q:"He who climbs upon the highest mountains laughs at all tragedies.",a:"Friedrich Nietzsche",k:"climbing highest mountains laughs tragedies"},
+    {q:"Life's challenges are not supposed to paralyze you, they're supposed to help you discover who you are.",a:"Bernice Johnson Reagon",k:"challenges discover who you are"},
+    {q:"The real voyage of discovery consists not in seeking new landscapes, but in having new eyes.",a:"Marcel Proust",k:"voyage discovery new eyes"},
+    {q:"Do not follow where the path may lead. Go instead where there is no path.",a:"Ralph Waldo Emerson",k:"no path go instead blazing"},
+    {q:"Man must rise above the Earth.",a:"Socrates",k:"man rising above earth"},
+    {q:"Mountains are the unmoving witnesses of the world.",a:"Unknown",k:"mountains unmoving witnesses world"},
+    // ── OCEAN & WATER ─────────────────────────────────────────────────────
+    {q:"The sea is the same as it has been since before men ever went on it in boats.",a:"Ernest Hemingway",k:"sea same since before boats"},
+    {q:"We are tied to the ocean. And when we go back to the sea, whether it is to sail or to watch, we are going back from whence we came.",a:"John F. Kennedy",k:"tied ocean returning whence"},
+    {q:"The ocean stirs the heart, inspires the imagination, and brings eternal joy to the soul.",a:"Robert Wyland",k:"ocean stirs heart soul joy"},
+    {q:"The sea, once it casts its spell, holds one in its net of wonder forever.",a:"Jacques Cousteau",k:"sea spell wonder forever net"},
+    {q:"Roll on, thou deep and dark blue ocean, roll!",a:"Lord Byron",k:"deep dark blue ocean rolling"},
+    {q:"To me, the sea is a continual miracle.",a:"Walt Whitman",k:"sea continual miracle"},
+    {q:"At sea, I learned how little a person can get along with, and, on the other hand, how much a person can endure.",a:"Robin Lee Graham",k:"sea little endure learned"},
+    {q:"The heart of man is very much like the sea, it has its storms, its tides and its depths.",a:"Vincent van Gogh",k:"heart sea storms tides depths"},
+    {q:"The cure for anything is salt water: sweat, tears, or the sea.",a:"Isak Dinesen",k:"cure salt water sweat tears sea"},
+    {q:"Being out there in the ocean, God's creation, it's like a gift He has given us to enjoy.",a:"Unknown",k:"ocean creation gift enjoying"},
+    {q:"You can't cross the sea merely by standing and staring at the water.",a:"Rabindranath Tagore",k:"crossing sea not staring"},
+    {q:"A drop of water, if it could write out its own history, would explain the universe to us.",a:"Lucy Larcom",k:"drop water history universe"},
+    {q:"The sea does not reward those who are too anxious, too greedy, or too impatient.",a:"Anne Morrow Lindbergh",k:"sea reward patient not anxious"},
+    {q:"Water is the softest thing, yet it can penetrate mountains and earth.",a:"Lao Tzu",k:"water soft penetrate mountains"},
+    {q:"Water always finds its way.",a:"Unknown",k:"water finding way always"},
+    {q:"She is water. Soft enough to offer life, tough enough to drown it.",a:"Rupi Kaur",k:"water soft tough dual nature"},
+    {q:"The sea is dangerous and its storms terrible, but these obstacles have never been sufficient reason to remain ashore.",a:"Ferdinand Magellan",k:"sea dangerous storms remain ashore"},
+    {q:"Do not wait for the last wave. Jump in.",a:"Unknown",k:"last wave jumping in"},
+    {q:"The sea is not less beautiful in our eyes because we know that sometimes ships are wrecked by it.",a:"Simone Weil",k:"sea beautiful ships wrecked"},
+    {q:"Rivers never go reverse, so try to live like a river — forget your past and focus on your future.",a:"Unknown",k:"river no reverse forward past"},
+    {q:"You can't change the waves, but you can learn to surf.",a:"Jon Kabat-Zinn",k:"waves surfing changing"},
+    {q:"My soul is full of longing for the secret of the sea.",a:"Henry Wadsworth Longfellow",k:"soul longing secret sea"},
+    {q:"We know only too well that what we are doing is nothing more than a drop in the ocean. But if the drop were not there, the ocean would be missing something.",a:"Mother Teresa",k:"drop ocean something missing"},
+    {q:"In rivers, the water that you touch is the last of what has passed and the first of that which comes.",a:"Leonardo da Vinci",k:"river water touching last first"},
+    {q:"Go to the sea to heal.",a:"Unknown",k:"sea healing going"},
+    {q:"Every time I stand before a beautiful beach, its waves seem to whisper to me.",a:"Unknown",k:"beach waves whispering beauty"},
+    {q:"The sea never changes and its works, for all the talk of men, are wrapped in mystery.",a:"Joseph Conrad",k:"sea unchanged mystery men talk"},
+    {q:"I need the sea because it teaches me.",a:"Pablo Neruda",k:"sea teaching need learning"},
+    {q:"Silently, one by one, in the infinite meadows of heaven, blossomed the lovely stars.",a:"Henry Wadsworth Longfellow",k:"stars blossoming meadows heaven"},
+    {q:"The ocean is a central image. It is the symbolism of a great journey.",a:"Enya",k:"ocean central image great journey"},
+    {q:"She was a girl who knew how to be happy even when she was sad.",a:"Marilyn Monroe",k:"girl happy even when sad"},
+    {q:"When you can't find your purpose in a day, make a difference in someone else's day.",a:"Unknown",k:"purpose difference someone else day"},
+    {q:"The river is everywhere.",a:"Hermann Hesse",k:"river everywhere Hesse"},
+    {q:"Not all those who wander are lost — some are just looking for the ocean.",a:"Unknown",k:"wandering lost looking ocean"},
+    {q:"In the beginning was the ocean.",a:"Unknown",k:"beginning ocean creation"},
+    {q:"Take me to the ocean. Let the waves crash over me.",a:"Unknown",k:"ocean waves crashing over"},
+    {q:"The ocean humbles you. You realize how small you are.",a:"Unknown",k:"ocean humbles small realizing"},
+    {q:"Wild seas make great sailors.",a:"Unknown",k:"wild seas great sailors"},
+    {q:"Live in the sunshine, swim the sea, drink the wild air.",a:"Ralph Waldo Emerson",k:"sunshine sea wild air drinking"},
+    {q:"The sea is as near as we come to another world.",a:"Anne Stevenson",k:"sea near another world"},
+    // ── COSMOS & THE INFINITE ─────────────────────────────────────────────
+    {q:"Two things fill the mind with ever new and increasing wonder: the starry sky above me and the moral law within me.",a:"Immanuel Kant",k:"starry sky moral law wonder"},
+    {q:"Somewhere, something incredible is waiting to be known.",a:"Carl Sagan",k:"incredible waiting known somewhere"},
+    {q:"The universe is under no obligation to make sense to you.",a:"Neil deGrasse Tyson",k:"universe obligation sense"},
+    {q:"Space is for everybody.",a:"Christa McAuliffe",k:"space everybody inclusion"},
+    {q:"The universe is not only queerer than we suppose, but queerer than we can suppose.",a:"J.B.S. Haldane",k:"universe queerer suppose"},
+    {q:"We are all astronauts on a little spaceship called Earth.",a:"Buckminster Fuller",k:"astronauts spaceship earth"},
+    {q:"The nitrogen in our DNA, the calcium in our teeth, the iron in our blood, were made in the interiors of collapsing stars.",a:"Carl Sagan",k:"stardust DNA calcium iron"},
+    {q:"To confine our attention to terrestrial matters would be to limit the human spirit.",a:"Stephen Hawking",k:"terrestrial spirit limit"},
+    {q:"The universe is one big joke and we're the punchline.",a:"Unknown",k:"universe joke punchline"},
+    {q:"Equipped with his five senses, man explores the universe around him and calls the adventure Science.",a:"Edwin Hubble",k:"senses exploring universe science"},
+    {q:"Across the universe flows a common love.",a:"Unknown",k:"across universe common love"},
+    {q:"This most beautiful system of the sun, planets, and comets could only proceed from the counsel and dominion of an intelligent and powerful Being.",a:"Isaac Newton",k:"sun planets comets beautiful system"},
+    {q:"I am large, I contain multitudes.",a:"Walt Whitman",k:"containing multitudes universe self"},
+    {q:"The universe is a pretty big place.",a:"Carl Sagan",k:"universe big place vast"},
+    {q:"Look up at the stars and not down at your feet.",a:"Stephen Hawking",k:"stars not feet looking up"},
+    {q:"For me, it is far better to grasp the Universe as it really is than to persist in delusion.",a:"Carl Sagan",k:"grasp universe delusion better"},
+    {q:"The cosmos is within us. We are made of star-stuff. We are a way for the universe to know itself.",a:"Carl Sagan",k:"cosmos within star stuff know"},
+    {q:"If the universe is expanding, why can't I?",a:"Unknown",k:"expanding universe expanding self"},
+    {q:"We are all just stories in the end.",a:"Steven Moffat",k:"stories end all of us"},
+    {q:"Not only are we in the universe, the universe is in us.",a:"Neil deGrasse Tyson",k:"in us universe within"},
+    {q:"However vast the darkness, we must supply our own light.",a:"Stanley Kubrick",k:"darkness light supplying own"},
+    {q:"The universe is 13.8 billion years old. You have been alive for less than a second of it.",a:"Unknown",k:"billion years alive second"},
+    {q:"Whether you believe you can do a thing or not, you are right.",a:"Henry Ford",k:"belief doing right either way"},
+    {q:"You are one of the rare people who can separate your observation from your desire.",a:"John Steinbeck",k:"observation separate desire rare"},
+    {q:"If you look at the stars long enough, they start to look back.",a:"Unknown",k:"stars looking back at you"},
+    {q:"Our planet is a lonely speck in the great enveloping cosmic dark.",a:"Carl Sagan",k:"lonely speck cosmic dark planet"},
+    {q:"The nitrogen in our DNA, the calcium in our teeth, the iron in our blood were made in the interiors of collapsing stars. We are made of star-stuff.",a:"Carl Sagan",k:"made star stuff collapsing"},
+    {q:"What is a star but the dream of an atom?",a:"Kahlil Gibran",k:"star dream atom Gibran"},
+    {q:"We are the universe observing itself.",a:"Unknown",k:"universe observing itself"},
+    {q:"Every atom in your body came from a star that exploded.",a:"Lawrence Krauss",k:"atom star exploded body"},
+    {q:"The universe does not owe you a pleasant journey.",a:"Unknown",k:"universe not owing pleasant"},
+    {q:"A universe with no edge in space, no beginning or end in time, and nothing for a creator to do.",a:"Stephen Hawking",k:"no edge beginning end universe"},
+    {q:"Science is a way of thinking much more than it is a body of knowledge.",a:"Carl Sagan",k:"science thinking more than knowledge"},
+    {q:"I'm astounded by people who want to 'know' the universe when it's hard enough to find your way around Chinatown.",a:"Woody Allen",k:"astounded know universe chinatown"},
+    {q:"My goal is simple. It is a complete understanding of the universe.",a:"Stephen Hawking",k:"complete understanding universe goal"},
+    {q:"It is a shame that we're stuck in the narrow band of the visible spectrum.",a:"Unknown",k:"narrow band visible spectrum"},
+    {q:"Equipped with his five senses, man explores the universe.",a:"Edwin Hubble",k:"five senses exploring universe"},
+    {q:"For small creatures such as we, the vastness is bearable only through love.",a:"Carl Sagan",k:"vastness bearable through love"},
+    {q:"We are all connected; to each other biologically, to the Earth chemically, and to the rest of the universe atomically.",a:"Neil deGrasse Tyson",k:"connected biologically chemically atomically"},
+    {q:"Not knowing is most intimate.",a:"Dizang Guichen",k:"not knowing intimate"},
+    // ── LIGHT & FIRE ──────────────────────────────────────────────────────
+    {q:"It is better to light a candle than to curse the darkness.",a:"Eleanor Roosevelt",k:"candle light darkness warm"},
+    {q:"The flame that burns twice as bright burns half as long.",a:"Lao Tzu",k:"bright flame burning"},
+    {q:"A spark of hope is worth more than a mountain of fear.",a:"Unknown",k:"spark hope mountain fear"},
+    {q:"You carry fire in you. Do not let the rain put it out.",a:"Unknown",k:"fire rain extinguish protect"},
+    {q:"Light thinks it travels faster than anything but it is wrong. No matter how fast light travels, it finds the darkness has always got there first.",a:"Terry Pratchett",k:"light darkness speed Pratchett"},
+    {q:"Within you is a light the world needs.",a:"Unknown",k:"inner light needed world"},
+    {q:"You are not the darkness you endured. You are the light that refused to surrender.",a:"John Mark Green",k:"light refuse surrender darkness"},
+    {q:"Set your life on fire. Seek those who fan your flames.",a:"Rumi",k:"fire flames seeking Rumi"},
+    {q:"Some people are so much sunshine to the square inch.",a:"Walt Whitman",k:"sunshine warmth human Whitman"},
+    {q:"There is a crack in everything. That's how the light gets in.",a:"Leonard Cohen",k:"crack wall light entering"},
+    {q:"We can easily forgive a child who is afraid of the dark; the real tragedy is when men are afraid of the light.",a:"Plato",k:"child afraid dark light Plato"},
+    {q:"Where all is darkness, even a little light is enough.",a:"Unknown",k:"small light enough darkness"},
+    {q:"Be a lamp, or a lifeboat, or a ladder.",a:"Rumi",k:"lamp lifeboat ladder help"},
+    {q:"Your light shines from within, not from outside.",a:"Unknown",k:"light within inside shining"},
+    {q:"Like a candle, you were made to bring light to the world.",a:"Unknown",k:"candle bring light world"},
+    // ── WORDS & STORY ─────────────────────────────────────────────────────
+    {q:"A word of encouragement during a failure is worth more than an hour of praise after success.",a:"Unknown",k:"words encouragement support"},
+    {q:"The pen is the tongue of the mind.",a:"Miguel de Cervantes",k:"pen writing mind ink"},
+    {q:"Words can inspire, and words can destroy. Choose yours well.",a:"Robin Sharma",k:"words power choosing"},
+    {q:"Stories are how we explain, how we teach, how we entertain ourselves and to imagine different futures.",a:"Unknown",k:"stories explain teach entertain"},
+    {q:"There is no greater agony than bearing an untold story inside you.",a:"Maya Angelou",k:"untold story inside bearing"},
+    {q:"Write what should not be forgotten.",a:"Isabel Allende",k:"write forgotten memory"},
+    {q:"If you don't know where you've come from, you don't know where you're going.",a:"Maya Angelou",k:"where come from going"},
+    {q:"Poetry is when an emotion has found its thought and the thought has found words.",a:"Robert Frost",k:"poetry emotion thought words"},
+    {q:"Books are mirrors: we only see in them what we already have inside us.",a:"Carlos Ruiz Zafón",k:"books mirrors inside us"},
+    {q:"The story of the human race is the story of men and women selling themselves short.",a:"Abraham Maslow",k:"human race story short selling"},
+    {q:"Tell me a fact and I'll learn. Tell me a truth and I'll believe. But tell me a story and it will live in my heart forever.",a:"Indian Proverb",k:"story live heart forever"},
+    {q:"I write because I don't know what I think until I read what I say.",a:"Flannery O'Connor",k:"write think read say"},
+    {q:"Reading is dreaming with open eyes.",a:"Patti Smith",k:"reading dreaming open eyes"},
+    {q:"Every book is a quotation from everywhere else.",a:"Ralph Waldo Emerson",k:"book quotation everywhere"},
+    {q:"One must always be careful of books, and what is inside them, for words have the power to change us.",a:"Cassandra Clare",k:"careful books words change"},
+    // ── SILENCE & STILLNESS ───────────────────────────────────────────────
+    {q:"In the silence there is space to hear yourself breathe.",a:"Unknown",k:"silence space breathe hear"},
+    {q:"Silence is a source of great strength.",a:"Lao Tzu",k:"silence strength source"},
+    {q:"Nothing in all the world is so still as the silence of morning.",a:"Unknown",k:"morning silence still world"},
+    {q:"In stillness, the world is restored.",a:"Lao Tzu",k:"stillness world restored"},
+    {q:"Rest is not idleness, and to lie sometimes on the grass under trees on a summer's day, listening to the murmur of the water, or watching the clouds float across the sky, is by no means a waste of time.",a:"John Lubbock",k:"rest grass trees summer idle"},
+    {q:"Let silence be your prayer.",a:"Unknown",k:"silence prayer contemplation"},
+    {q:"Silence is the sleep that nourishes wisdom.",a:"Francis Bacon",k:"silence sleep wisdom nourishes"},
+    {q:"In the midst of movement and chaos, keep stillness inside of you.",a:"Deepak Chopra",k:"movement chaos stillness inside"},
+    {q:"The most important things are the hardest to say.",a:"Stephen King",k:"important hardest say truth"},
+    {q:"A quiet conscience sleeps through thunder.",a:"English Proverb",k:"quiet conscience sleep thunder"},
+    {q:"Sometimes the most profound of awakenings come wrapped in the quietest of moments.",a:"Unknown",k:"profound awakening quiet moment"},
+    {q:"True silence is the rest of the mind; it is to the spirit what sleep is to the body.",a:"William Penn",k:"silence rest mind spirit body"},
+    {q:"To know how to be silent is the highest form of wisdom.",a:"Unknown",k:"silent highest wisdom form"},
+    {q:"In quietness and confidence shall be your strength.",a:"Isaiah 30:15",k:"quietness confidence strength"},
+    {q:"The quieter you become, the more you are able to hear.",a:"Rumi",k:"quieter hear more Rumi"},
+    {q:"It is in the quiet crucible of your personal, private sufferings that your noblest dreams are born.",a:"Jessie Hill Ford",k:"quiet crucible suffering dreams born"},
+    // ── BODY & BREATH ─────────────────────────────────────────────────────
+    {q:"Breath is the bridge which connects life to consciousness.",a:"Thich Nhat Hanh",k:"breath bridge life consciousness"},
+    {q:"Just breathe. Ten seconds of courage can change your life.",a:"Unknown",k:"breathe ten seconds courage"},
+    {q:"Your body hears everything your mind says.",a:"Naomi Judd",k:"body hears mind says"},
+    {q:"Take care of your body. It's the only place you have to live.",a:"Jim Rohn",k:"take care body place live"},
+    {q:"To keep the body in good health is a duty; otherwise we shall not be able to keep our mind strong and clear.",a:"Buddha",k:"body health duty mind strong"},
+    {q:"Rest when you're weary. Refresh and renew yourself.",a:"Unknown",k:"rest weary refresh renew"},
+    {q:"The body is your temple. Keep it pure and clean for the soul to reside in.",a:"B.K.S. Iyengar",k:"body temple pure clean soul"},
+    {q:"Sleep is that golden chain that ties health and our bodies together.",a:"Thomas Dekker",k:"sleep golden chain health bodies"},
+    {q:"Healing is not an overnight process. It is a daily cleansing of pain.",a:"Leon Brown",k:"healing daily cleansing pain"},
+    {q:"Everything you need is already inside you.",a:"Unknown",k:"everything need inside already"},
+    {q:"Your body knows things a long time before your mind catches up to them.",a:"Unknown",k:"body knows mind catches up"},
+    {q:"A healthy outside starts from the inside.",a:"Robert Urich",k:"healthy outside inside starts"},
+    {q:"Walk as if you are kissing the Earth with your feet.",a:"Thich Nhat Hanh",k:"walk kiss earth feet"},
+    {q:"Listen to the whispers of your body before they become screams.",a:"Unknown",k:"listen whisper body screams"},
+    // ── BEAUTY ────────────────────────────────────────────────────────────
+    {q:"The world is full of beauty when your heart is full of love.",a:"Unknown",k:"world beauty heart love full"},
+    {q:"Beauty is not in the face; beauty is a light in the heart.",a:"Kahlil Gibran",k:"beauty light heart face Gibran"},
+    {q:"To see beauty in everything is the beginning of wisdom.",a:"Unknown",k:"beauty everything wisdom beginning"},
+    {q:"Though we travel the world over to find the beautiful, we must carry it with us or we find it not.",a:"Ralph Waldo Emerson",k:"travel beautiful carry within"},
+    {q:"The most beautiful thing we can experience is the mysterious.",a:"Albert Einstein",k:"beautiful mysterious experience"},
+    {q:"There is nothing more beautiful than someone who goes out of their way to make life beautiful for others.",a:"Mandy Hale",k:"beautiful someone making life others"},
+    {q:"Beauty begins the moment you decide to be yourself.",a:"Coco Chanel",k:"beauty begins yourself decide"},
+    {q:"The earth laughs in flowers.",a:"Ralph Waldo Emerson",k:"earth laughs flowers meadow"},
+    {q:"Rainbows apologize for angry skies.",a:"Sylvia A. Voirol",k:"rainbow apologize angry sky"},
+    {q:"Beauty is power; a smile is its sword.",a:"John Ray",k:"beauty power smile sword"},
+    {q:"There are so many beautiful reasons to be happy.",a:"Unknown",k:"beautiful reasons happy many"},
+    {q:"She had a galaxy in her eyes, a universe in her mind.",a:"Unknown",k:"galaxy eyes universe mind"},
+    {q:"Look at the world from inside out instead of outside in.",a:"Unknown",k:"world inside out perspective"},
+    {q:"Life is full of beauty. Notice it.",a:"Ashley Smith",k:"life beauty notice it"},
+    {q:"A thing of beauty is a joy forever.",a:"John Keats",k:"beauty joy forever Keats"},
+    {q:"Beauty is not who you are on the outside; it is the wisdom and time you gave away.",a:"Dodinsky",k:"beauty inside wisdom time give"},
+    // ── TIME & IMPERMANENCE ───────────────────────────────────────────────
+    {q:"This too shall pass.",a:"Persian Proverb",k:"this too shall pass time"},
+    {q:"Time is the most valuable thing a man can spend.",a:"Theophrastus",k:"time valuable spend man"},
+    {q:"Time flies. It's up to you to be the navigator.",a:"Robert Orben",k:"time flies navigator guide"},
+    {q:"Yesterday is history. Tomorrow is a mystery. Today is a gift.",a:"Eleanor Roosevelt",k:"yesterday history tomorrow mystery today gift"},
+    {q:"The present moment is the only moment available to us, and it is the door to all moments.",a:"Thich Nhat Hanh",k:"present moment door available"},
+    {q:"We must use time wisely and forever realize that the time is always ripe to do right.",a:"Nelson Mandela",k:"time wisely ripe do right"},
+    {q:"How we spend our days is, of course, how we spend our lives.",a:"Annie Dillard",k:"days spend lives course"},
+    {q:"Lost time is never found again.",a:"Benjamin Franklin",k:"lost time never found Franklin"},
+    {q:"You can't go back and change the beginning, but you can start where you are and change the ending.",a:"C.S. Lewis",k:"change beginning start ending"},
+    {q:"Dost thou love life? Then do not squander time.",a:"Benjamin Franklin",k:"love life squander time Franklin"},
+    {q:"The key is in not spending time, but in investing it.",a:"Stephen R. Covey",k:"time investing key spending"},
+    {q:"An inch of time cannot be bought with an inch of gold.",a:"Chinese Proverb",k:"inch time gold proverb"},
+    {q:"Let the beauty of what you love be what you do.",a:"Rumi",k:"beauty love what you do"},
+    {q:"The two most powerful warriors are patience and time.",a:"Leo Tolstoy",k:"patience time powerful warriors"},
+    {q:"Make each day your masterpiece.",a:"John Wooden",k:"day masterpiece make each"},
+    // ── WONDER & CURIOSITY ────────────────────────────────────────────────
+    {q:"The cure for boredom is curiosity. There is no cure for curiosity.",a:"Ellen Parr",k:"cure boredom curiosity"},
+    {q:"Millions saw the apple fall, but Newton asked why.",a:"Bernard Baruch",k:"apple fall Newton why curiosity"},
+    {q:"The important thing is not to stop questioning.",a:"Albert Einstein",k:"questioning stop important Einstein"},
+    {q:"Wonder is the beginning of wisdom.",a:"Socrates",k:"wonder beginning wisdom Socrates"},
+    {q:"To live is so startling it leaves little time for anything else.",a:"Emily Dickinson",k:"live startling time little else"},
+    {q:"The world is a book and those who do not travel read only one page.",a:"Saint Augustine",k:"world book travel page"},
+    {q:"Man cannot discover new oceans unless he has the courage to lose sight of the shore.",a:"André Gide",k:"discover oceans courage shore"},
+    {q:"Life is either a daring adventure or nothing at all.",a:"Helen Keller",k:"daring adventure nothing life"},
+    {q:"If you want to go fast, go alone. If you want to go far, go together.",a:"African Proverb",k:"fast alone far together"},
+    {q:"You don't have to be great to start, but you have to start to be great.",a:"Zig Ziglar",k:"start great begin Ziglar"},
+    {q:"Curiosity is one of the great secrets of happiness.",a:"Bryant H. McGill",k:"curiosity happiness secrets great"},
+    {q:"The real voyage of discovery consists not in seeking new landscapes, but in having new eyes.",a:"Marcel Proust",k:"voyage discovery new eyes landscapes"},
+    {q:"Not all those who wander are lost. Some of us are just curious.",a:"Unknown",k:"wander curious not lost"},
+    {q:"Adventure is worthwhile in itself.",a:"Amelia Earhart",k:"adventure worthwhile itself Earhart"},
+    {q:"Knowledge is the compass that guides every adventure.",a:"Unknown",k:"knowledge compass guides adventure"},
+    {q:"Seek first to understand, then to be understood.",a:"Stephen R. Covey",k:"understand understood seek first"},
+    // ── MUSIC & ART ───────────────────────────────────────────────────────
+    {q:"Music gives a soul to the universe, wings to the mind, flight to the imagination.",a:"Plato",k:"music soul universe wings mind"},
+    {q:"Art enables us to find ourselves and lose ourselves at the same time.",a:"Thomas Merton",k:"art find lose ourselves"},
+    {q:"Every artist dips his brush in his own soul, and paints his own nature into his pictures.",a:"Henry Ward Beecher",k:"artist brush soul paints nature"},
+    {q:"The aim of art is to represent not the outward appearance of things, but their inward significance.",a:"Aristotle",k:"art inward significance outward"},
+    {q:"Without music, life would be a mistake.",a:"Friedrich Nietzsche",k:"music life mistake without"},
+    {q:"Art is the lie that enables us to realize the truth.",a:"Pablo Picasso",k:"art lie truth realize Picasso"},
+    {q:"Creativity is intelligence having fun.",a:"Albert Einstein",k:"creativity intelligence fun Einstein"},
+    {q:"The purpose of art is washing the dust of daily life off our souls.",a:"Pablo Picasso",k:"art washing dust daily souls"},
+    {q:"Great art picks up where nature ends.",a:"Marc Chagall",k:"art picks up where nature ends"},
+    {q:"An artist must not fail; it is success to have tried.",a:"Unknown",k:"artist not fail success tried"},
+    {q:"Painting is poetry that is seen rather than felt.",a:"Leonardo da Vinci",k:"painting poetry seen felt Vinci"},
+    {q:"Art is not what you see, but what you make others see.",a:"Edgar Degas",k:"art see make others Degas"},
+    {q:"Every child is an artist. The problem is how to remain an artist once he grows up.",a:"Pablo Picasso",k:"child artist remain grow up"},
+    {q:"Music is what feelings sound like.",a:"Unknown",k:"music feelings sound like"},
+    {q:"The job of the artist is always to deepen the mystery.",a:"Francis Bacon",k:"artist deepen mystery Bacon"},
+    {q:"Creativity takes courage.",a:"Henri Matisse",k:"creativity courage Matisse"},
+    // ── COMPASSION ────────────────────────────────────────────────────────
+    {q:"Compassion is the wish to see others free from suffering.",a:"Dalai Lama",k:"compassion free suffering wish"},
+    {q:"You cannot do a kindness too soon.",a:"Ralph Waldo Emerson",k:"kindness soon never late"},
+    {q:"We rise by lifting others.",a:"Robert Ingersoll",k:"rise lifting others together"},
+    {q:"Wherever there is a human being, there is an opportunity for a kindness.",a:"Lucius Annaeus Seneca",k:"human kindness opportunity"},
+    {q:"In a gentle way, you can shake the world.",a:"Mahatma Gandhi",k:"gentle shake world Gandhi"},
+    {q:"No act of kindness, no matter how small, is ever wasted.",a:"Aesop",k:"kindness small never wasted Aesop"},
+    {q:"One of the most important things you can do on this earth is to let people know they are not alone.",a:"Shannon L. Alder",k:"important let know not alone"},
+    {q:"If you see someone without a smile, give them one of yours.",a:"Dolly Parton",k:"smile give someone yours"},
+    {q:"Be the change that you wish to see in the world.",a:"Mahatma Gandhi",k:"change wish world Gandhi"},
+    {q:"The quality of mercy is not strained; it droppeth as the gentle rain from heaven.",a:"William Shakespeare",k:"mercy gentle rain heaven Shakespeare"},
+    {q:"Empathy is seeing with the eyes of another, listening with the ears of another and feeling with the heart of another.",a:"Alfred Adler",k:"empathy seeing listening feeling another"},
+    {q:"We can judge the heart of a man by his treatment of animals.",a:"Immanuel Kant",k:"heart man animals treatment"},
+    {q:"A kind word can warm three winter months.",a:"Japanese Proverb",k:"kind word warm winter months"},
+    {q:"Let us be grateful to the people who make us happy.",a:"Marcel Proust",k:"grateful people make happy Proust"},
+    {q:"Do your little bit of good where you are; it is those little bits of good put together that overwhelm the world.",a:"Desmond Tutu",k:"little good together overwhelm world"},
+    // ── DREAMS ────────────────────────────────────────────────────────────
+    {q:"All our dreams can come true, if we have the courage to pursue them.",a:"Walt Disney",k:"dreams true courage pursue Disney"},
+    {q:"Dream big and dare to fail.",a:"Norman D. Vaughan",k:"dream big dare fail"},
+    {q:"The future belongs to those who believe in the beauty of their dreams.",a:"Eleanor Roosevelt",k:"future belongs believe dreams"},
+    {q:"Don't let anyone tell you that you can't do something.",a:"Unknown",k:"someone tell you cannot do"},
+    {q:"Keep your eyes on the stars and your feet on the ground.",a:"Theodore Roosevelt",k:"eyes stars feet ground"},
+    {q:"A dream you dream alone is only a dream. A dream you dream together is reality.",a:"John Lennon",k:"dream alone together reality Lennon"},
+    {q:"Hold fast to dreams, for if dreams die, life is a broken-winged bird that cannot fly.",a:"Langston Hughes",k:"hold dreams die bird broken"},
+    {q:"You have to dream before your dreams can come true.",a:"A.P.J. Abdul Kalam",k:"dream before dreams come true"},
+    {q:"Go confidently in the direction of your dreams.",a:"Henry David Thoreau",k:"confidently direction dreams Thoreau"},
+    {q:"The biggest adventure you can take is to live the life of your dreams.",a:"Oprah Winfrey",k:"adventure live life dreams Oprah"},
+    {q:"Every great dream begins with a dreamer.",a:"Harriet Tubman",k:"great dream begins dreamer"},
+    {q:"To accomplish great things, we must not only act, but also dream.",a:"Anatole France",k:"great things act dream accomplish"},
+    {q:"Dreams are illustrations from the book your soul is writing about you.",a:"Marsha Norman",k:"dreams illustrations soul writing book"},
+    {q:"A dreamer is one who can only find his way by moonlight.",a:"Oscar Wilde",k:"dreamer find way moonlight Wilde"},
+    {q:"Dreaming permits each and every one of us to be quietly and safely insane every night.",a:"William Dement",k:"dreaming insane safely night"},
+    {q:"The only thing that will stop you from fulfilling your dreams is you.",a:"Tom Bradley",k:"stop fulfilling dreams yourself"},
+    // ── LETTING GO ────────────────────────────────────────────────────────
+    {q:"To let go does not mean to get rid of. To let go means to let be.",a:"Jack Kornfield",k:"let go let be not rid"},
+    {q:"Breathe. Let go. And remind yourself that this very moment is the only one you know you have for sure.",a:"Oprah Winfrey",k:"breathe let go moment sure"},
+    {q:"You don't have to control your thoughts; you just have to stop letting them control you.",a:"Dan Millman",k:"thoughts control stop letting"},
+    {q:"Holding on is believing that there's only a past; letting go is knowing that there's a future.",a:"Daphne Rose Kingma",k:"holding past letting go future"},
+    {q:"The truth is, unless you let go, unless you forgive yourself, unless you forgive the situation, unless you realize that the situation is over, you cannot move forward.",a:"Steve Maraboli",k:"let go forgive situation move forward"},
+    {q:"Grief is the price we pay for love.",a:"Queen Elizabeth II",k:"grief price pay love"},
+    {q:"There is a sacredness in tears. They are not the mark of weakness, but of power.",a:"Washington Irving",k:"tears sacredness power not weakness"},
+    {q:"The darker the night, the more earnestly we must believe in the dawn.",a:"Unknown",k:"darker night earnestly believe dawn"},
+    {q:"Forgiveness does not change the past, but it does enlarge the future.",a:"Paul Boese",k:"forgiveness past future enlarge"},
+    {q:"Let your tears come. Let them water your soul.",a:"Eileen Mayhew",k:"tears come water soul"},
+    {q:"Release what is heavy. Carry only what feeds you.",a:"Unknown",k:"release heavy carry feeds you"},
+    {q:"What we cling to often weighs us down.",a:"Unknown",k:"cling weighs down letting go"},
+    {q:"Sometimes you have to let things go, so there is room for better things to come.",a:"Unknown",k:"let go room better things come"},
+    {q:"The art of losing is not hard to master.",a:"Elizabeth Bishop",k:"art losing master Bishop"},
+    {q:"We cannot solve our problems with the same thinking we used when we created them.",a:"Albert Einstein",k:"solve problems different thinking"},
+    {q:"Change is the end result of all true learning.",a:"Leo Buscaglia",k:"change end result learning"},
+    // ── SEASONS ───────────────────────────────────────────────────────────
+    {q:"Every winter has its spring.",a:"Unknown",k:"winter spring every season"},
+    {q:"No winter lasts forever; no spring skips its turn.",a:"Hal Borland",k:"winter spring forever skips turn"},
+    {q:"To everything there is a season and a time for every purpose.",a:"Ecclesiastes 3:1",k:"season time purpose everything"},
+    {q:"One must have chaos in oneself in order to give birth to a dancing star.",a:"Friedrich Nietzsche",k:"chaos birth dancing star"},
+    {q:"In autumn, all the leaves fall and I am left alone again.",a:"Unknown",k:"autumn leaves fall alone"},
+    {q:"Spring shows what God can do with a drab and dirty world.",a:"Virgil A. Kraft",k:"spring God drab dirty world"},
+    {q:"Autumn is the hardest season. The leaves are all falling, and they're falling like they're falling in love with the ground.",a:"Andrea Gibson",k:"autumn leaves falling love ground"},
+    {q:"Live in each season as it passes; breathe the air, drink the drink, taste the fruit.",a:"Henry David Thoreau",k:"live each season breathe drink taste"},
+    {q:"In the spring, the poet dances. In the summer, the poet sweats. In the autumn, the poet falls. In the winter, the poet is reborn.",a:"Unknown",k:"poet season spring summer autumn winter"},
+    {q:"And suddenly you know: it's time to start something new and trust the magic of beginnings.",a:"Meister Eckhart",k:"time start new trust magic beginnings"},
+    {q:"The same sun that melts the wax, hardens the clay.",a:"Unknown",k:"sun melts wax hardens clay"},
+    {q:"Trees that are slow to grow bear the best fruit.",a:"Molière",k:"trees slow grow best fruit"},
+    {q:"Bloom where you are planted.",a:"Unknown",k:"bloom planted where you are"},
+    {q:"Spring is proof that there is beauty in new beginnings.",a:"Unknown",k:"spring proof beauty new beginnings"},
+    {q:"After every storm there is a rainbow.",a:"Unknown",k:"storm rainbow after every"},
+    {q:"The snow is melting into music.",a:"John Muir",k:"snow melting music Muir"},
+    // ── LOSS & LONGING ────────────────────────────────────────────────────
+    {q:"The heart was made to be broken.",a:"Oscar Wilde",k:"heart broken made Wilde"},
+    {q:"There is no grief like the grief that does not speak.",a:"Henry Wadsworth Longfellow",k:"grief speak silent Longfellow"},
+    {q:"Sometimes good things fall apart so better things can fall together.",a:"Marilyn Monroe",k:"fall apart together better things"},
+    {q:"Grief can be the garden of compassion.",a:"Rumi",k:"grief garden compassion Rumi"},
+    {q:"Wherever you are is called Here.",a:"David Wagoner",k:"here present wherever called"},
+    {q:"The pain you feel today is the strength you feel tomorrow.",a:"Unknown",k:"pain today strength tomorrow"},
+    {q:"What is gone is gone. Yet sometimes what is gone most carefully is what returns.",a:"Unknown",k:"gone returns carefully what"},
+    {q:"Loss is nothing else but change, and change is Nature's delight.",a:"Marcus Aurelius",k:"loss change nature delight"},
+    {q:"We never lose the people we love, even to death. They continue to participate in every act of joy we experience.",a:"Leo Buscaglia",k:"never lose love death participate joy"},
+    {q:"The wound is the place where the Light enters you.",a:"Rumi",k:"wound place light enters Rumi"},
+    {q:"Absence sharpens love, presence strengthens it.",a:"Thomas Fuller",k:"absence love presence sharpens"},
+    {q:"Sometimes when you lose your way, you find yourself.",a:"Mandy Hale",k:"lose way find yourself"},
+    {q:"Your heart will break many times and each time it is so you can love more completely.",a:"Unknown",k:"heart break times love completely"},
+    {q:"You were given this life because you are strong enough to live it.",a:"Unknown",k:"given life strong enough live"},
+    {q:"Out of suffering have emerged the strongest souls.",a:"Kahlil Gibran",k:"suffering emerged strongest souls"},
+    // ── INNER PEACE ───────────────────────────────────────────────────────
+    {q:"Peace comes from within. Do not seek it without.",a:"Buddha",k:"peace within seek without"},
+    {q:"Do not let the behavior of others destroy your inner peace.",a:"Dalai Lama",k:"behavior others destroy inner peace"},
+    {q:"Nobody can bring you peace but yourself.",a:"Ralph Waldo Emerson",k:"nobody peace yourself bring"},
+    {q:"First keep peace with yourself, then you can also bring peace to others.",a:"Thomas à Kempis",k:"peace yourself others bring"},
+    {q:"Peace is not absence of conflict, it is the ability to handle conflict by peaceful means.",a:"Ronald Reagan",k:"peace absence conflict handle"},
+    {q:"The life of inner peace, being harmonious and without stress, is the easiest type of existence.",a:"Norman Vincent Peale",k:"inner peace harmonious stress"},
+    {q:"You find peace not by rearranging the circumstances of your life, but by realizing who you are.",a:"Eckhart Tolle",k:"peace circumstances life realizing who"},
+    {q:"Serenity is not freedom from the storm, but peace amid the storm.",a:"Unknown",k:"serenity storm peace amid"},
+    {q:"Within you there is a stillness and a sanctuary to which you can retreat.",a:"Hermann Hesse",k:"stillness sanctuary retreat within"},
+    {q:"The quieter you become, the more you can hear.",a:"Ram Dass",k:"quieter become hear more"},
+    {q:"Equanimity is the ability to feel and not be lost.",a:"Unknown",k:"equanimity feel not lost"},
+    {q:"Let go of what was. Be at peace with what is. Dream of what will be.",a:"Unknown",k:"let go peace dream was is will be"},
+    {q:"To a mind that is still, the whole universe surrenders.",a:"Lao Tzu",k:"mind still universe surrenders Lao Tzu"},
+    {q:"The present moment is the only home you'll ever have.",a:"Unknown",k:"present moment home only have"},
+    {q:"Peace is not something you wish for; it's something you make, something you do, something you are.",a:"Robert Fulghum",k:"peace wish make do are"},
+    // ── ABUNDANCE & GRATITUDE ─────────────────────────────────────────────
+    {q:"Gratitude turns what we have into enough.",a:"Melody Beattie",k:"gratitude enough have turns"},
+    {q:"The more you praise and celebrate your life, the more there is in life to celebrate.",a:"Oprah Winfrey",k:"praise celebrate life more"},
+    {q:"Gratitude is not only the greatest of virtues, but the parent of all the others.",a:"Cicero",k:"gratitude greatest virtue parent"},
+    {q:"Enjoy the little things, for one day you may look back and realize they were the big things.",a:"Robert Brault",k:"little things enjoy big realize"},
+    {q:"What if you woke up today with only the things you thanked God for yesterday?",a:"Unknown",k:"woke things thanked God yesterday"},
+    {q:"Appreciation is a wonderful thing. It makes what is excellent in others belong to us as well.",a:"Voltaire",k:"appreciation excellent others belong"},
+    {q:"Count your blessings, not your problems.",a:"Unknown",k:"count blessings problems not"},
+    {q:"Piglet noticed that even though he had a very small heart, it could hold a rather large amount of gratitude.",a:"A.A. Milne",k:"Piglet heart gratitude small large"},
+    {q:"The secret of happiness is not in doing what one likes, but in liking what one does.",a:"James M. Barrie",k:"happiness liking what one does"},
+    {q:"At the end of the day, let there be no excuses, no explanations, no regrets.",a:"Steve Maraboli",k:"end day excuses regrets no"},
+    {q:"The miracle is not to fly in the air or to walk on the water, but to walk on the earth.",a:"Chinese Proverb",k:"miracle walk earth air water"},
+    {q:"Gratitude is when memory is stored in the heart and not in the mind.",a:"Lionel Hampton",k:"gratitude memory heart mind"},
+    {q:"One day you will wake up and there won't be any more time to do the things you've always wanted to do.",a:"Paulo Coelho",k:"wake up time things wanted do"},
+    {q:"Live in the sunshine, swim in the sea, drink the wild air.",a:"Ralph Waldo Emerson",k:"sunshine swim sea wild air"},
+    {q:"When you realize there is nothing lacking, the whole world belongs to you.",a:"Lao Tzu",k:"nothing lacking world belongs Lao Tzu"},
+    // ── FINAL NINE ────────────────────────────────────────────────────────
+    {q:"The most common form of despair is not being who you are.",a:"Søren Kierkegaard",k:"despair not being who you are"},
+    {q:"You were wild here once. Don't let them tame you.",a:"Isadora Duncan",k:"wild tame Isadora Duncan"},
+    {q:"There is nothing to writing. All you do is sit down at a typewriter and bleed.",a:"Ernest Hemingway",k:"writing bleed typewriter Hemingway"},
+    {q:"I am not afraid of storms, for I am learning how to sail my ship.",a:"Louisa May Alcott",k:"afraid storms learning sail ship"},
+    {q:"What lies behind you and what lies in front of you pales in comparison to what lies inside of you.",a:"Ralph Waldo Emerson",k:"behind in front inside comparison"},
+    {q:"Even if I knew that tomorrow the world would go to pieces, I would still plant my apple tree.",a:"Martin Luther",k:"plant apple tree tomorrow world"},
+    {q:"Do not be too timid and squeamish about your actions. All life is an experiment.",a:"Ralph Waldo Emerson",k:"life experiment timid actions"},
+    {q:"We are not given a good life or a bad life. We are given a life. It's up to us to make it good or bad.",a:"Unknown",k:"given life good bad make"},
+    {q:"The cave you fear to enter holds the treasure you seek.",a:"Joseph Campbell",k:"cave fear enter treasure seek"},
+  ];
+
+  const MET_SEARCH = 'https://collectionapi.metmuseum.org/public/collection/v1/search';
+  const MET_OBJECT = 'https://collectionapi.metmuseum.org/public/collection/v1/objects';
+  const CACHE_KEY = 'met_painting_v1';
+
+  function getCache() {
+    try { return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}'); } catch { return {}; }
+  }
+  function setCache(c) {
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(c)); } catch {}
+  }
+
+  async function fetchPainting(idx) {
+    const cache = getCache();
+    if (cache[idx]) return cache[idx];
+    const q = Q[idx];
+    try {
+      const sr = await fetch(`${MET_SEARCH}?isPublicDomain=true&q=${encodeURIComponent(q.k)}`);
+      const sd = await sr.json();
+      const ids = (sd.objectIDs || []).slice(0, 6);
+      if (!ids.length) return null;
+      const objects = await Promise.all(ids.map(id => fetch(`${MET_OBJECT}/${id}`).then(r => r.json())));
+      const art = objects.find(o => o.primaryImageSmall);
+      if (art) {
+        const p = { url: art.primaryImageSmall, credit: `${art.title} — ${art.artistDisplayName || 'Unknown'}` };
+        const c2 = getCache(); c2[idx] = p; setCache(c2);
+        return p;
+      }
+    } catch {}
+    return null;
+  }
+
+  let current = 0;
+  const quoteText = document.getElementById('quoteText');
+  const quoteAuthor = document.getElementById('quoteAuthor');
+  const nextBtn = document.getElementById('nextBtn');
+  const themeBg = document.getElementById('themeBg');
+  const paintingCredit = document.getElementById('paintingCredit');
+
+  current = Math.floor(Math.random() * Q.length);
+
+
+  function applyPainting(p, animate) {
+    if (!p) return;
+    if (!animate) {
+      themeBg.style.backgroundImage = `url('${p.url}')`;
+      paintingCredit.textContent = p.credit;
+      return;
+    }
+    themeBg.classList.add('fading');
+    setTimeout(() => {
+      themeBg.style.backgroundImage = `url('${p.url}')`;
+      paintingCredit.textContent = p.credit;
+      themeBg.classList.remove('fading');
+    }, 300);
+  }
+
+  async function showQuote(animate) {
+    if (animate) {
+      quoteText.classList.add('fading');
+      quoteAuthor.classList.add('fading');
+      setTimeout(() => {
+        quoteText.textContent = Q[current].q;
+        quoteAuthor.textContent = Q[current].a;
+        requestAnimationFrame(() => {
+          quoteText.classList.remove('fading');
+          quoteAuthor.classList.remove('fading');
+        });
+      }, 150);
+    } else {
+      quoteText.textContent = Q[current].q;
+      quoteAuthor.textContent = Q[current].a;
+    }
+    const p = await fetchPainting(current);
+    applyPainting(p, animate);
+    // Preload next 3
+    for (let i = 1; i <= 3; i++) fetchPainting((current + i) % Q.length);
+  }
+
+  nextBtn.addEventListener('click', () => {
+    nextBtn.disabled = true;
+    nextBtn.classList.add('switching');
+    current = (current + 1) % Q.length;
+    showQuote(true);
+    setTimeout(() => { nextBtn.classList.remove('switching'); nextBtn.disabled = false; }, 350);
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space' || e.code === 'ArrowRight') { e.preventDefault(); nextBtn.click(); }
+  });
+
+  showQuote(false);
+  </script>
+</body>
+</html>
